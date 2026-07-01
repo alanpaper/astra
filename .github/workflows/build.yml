@@ -21,24 +21,30 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
-    env:
-      CARGO_TERM_COLOR: always
-
     steps:
-      # ================= CHECKOUT =================
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ================= NODE (NPM ONLY) =================
+      # ================= FIX 1: LOCK PNPM VERSION =================
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0 # ✅ 固定版本（关键修复）
+
+      # ================= NODE =================
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: latest
-          cache: npm
+          node-version: 24
+          cache: pnpm
 
-      # ================= INSTALL DEPENDENCIES =================
-      - name: Install dependencies (npm)
-        run: npm install
+      # ================= FIX 2: DISABLE STRICT POLICY =================
+      - name: Disable pnpm build security policy
+        run: pnpm config set enable-pre-post-scripts true
+
+      # ================= INSTALL =================
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --unsafe-perm
 
       # ================= RUST =================
       - name: Setup Rust
@@ -51,10 +57,10 @@ jobs:
 
       # ================= BUILD =================
       - name: Build Tauri App
-        run: npm run tauri build -- --target ${{ matrix.target }}
+        run: pnpm tauri build --target ${{ matrix.target }}
 
-      # ================= CREATE RELEASE =================
-      - name: Create GitHub Release
+      # ================= RELEASE =================
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -64,7 +70,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ================= MAC =================
-      - name: Upload macOS DMG
+      - name: Upload DMG
         if: matrix.platform == 'macos'
         uses: softprops/action-gh-release@v2
         with:
@@ -73,30 +79,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload macOS APP
-        if: matrix.platform == 'macos'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       # ================= WINDOWS =================
-      - name: Upload Windows EXE
+      - name: Upload EXE
         if: matrix.platform == 'windows'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Windows MSI
-        if: matrix.platform == 'windows'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
