@@ -151,6 +151,26 @@
     node.focus();
   }
 
+  // ===== 全局快捷键 =====
+  function handleKeydown(e: KeyboardEvent) {
+    // Cmd+K / Ctrl+K → 聚焦搜索
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      const searchInput = document.querySelector('.hero-search-input');
+      if (searchInput) (searchInput as HTMLInputElement).focus();
+    }
+    // Escape → 返回工作空间 / 关闭弹窗
+    if (e.key === 'Escape') {
+      if (selectedProject) {
+        e.preventDefault();
+        backToWorkspace();
+      } else if (showCreateModal) {
+        e.preventDefault();
+        closeCreateModal();
+      }
+    }
+  }
+
   // ===== 新建项目弹窗状态 =====
   let showCreateModal = $state(false);
   let newFolderName = $state('');
@@ -244,7 +264,7 @@
   }
 </script>
 
-<div class="workspace-page">
+<div class="workspace-page" onkeydown={handleKeydown} role="presentation" tabindex="-1">
   <!-- 未设置工作空间 -->
   {#if !workspacePath && !loading}
     <div class="no-workspace">
