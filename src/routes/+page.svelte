@@ -22,7 +22,13 @@
 
   interface AppSettings {
     editor: EditorSetting;
-    workspace_path: string | null;
+    workspaces: WorkspaceConfig[];
+    active_workspace: string | null;
+  }
+
+  interface WorkspaceConfig {
+    name: string;
+    path: string;
   }
 
   // ===== 状态 =====
@@ -32,6 +38,7 @@
   let error = $state('');
   let searchQuery = $state('');
   let editorSetting = $state<EditorSetting>({ name: '', command: '' });
+  let workspaces = $state<WorkspaceConfig[]>([]);
 
   // ===== 页面加载时自动读取设置并扫描 =====
   onMount(async () => {
@@ -43,13 +50,25 @@
     try {
       const settings = await invoke<AppSettings>('get_settings');
       editorSetting = settings.editor;
+      workspaces = settings.workspaces;
 
-      if (settings.workspace_path) {
-        workspacePath = settings.workspace_path;
-        scanWorkspace(settings.workspace_path);
+      if (settings.active_workspace) {
+        workspacePath = settings.active_workspace;
+        scanWorkspace(settings.active_workspace);
       }
     } catch (e) {
       console.error('加载设置失败:', e);
+    }
+  }
+
+  // ===== 切换工作空间 =====
+  async function switchWorkspace(path: string) {
+    try {
+      await invoke('set_active_workspace', { path });
+      workspacePath = path;
+      scanWorkspace(path);
+    } catch (e) {
+      error = `切换工作空间失败: ${e}`;
     }
   }
 
@@ -138,6 +157,10 @@
   let newProjectName = $state('');
   let creating = $state(false);
 
+  // ===== 详情视图状态 =====
+  let selectedProject = $state<ProjectDetail | null>(null);
+  let detailLoading = $state(false);
+
   function openCreateModal() {
     newFolderName = '';
     newProjectName = '';
@@ -192,9 +215,6 @@
     readme_preview: string;
     sub_items: SubDetail[];
   }
-
-  let selectedProject = $state<ProjectDetail | null>(null);
-  let detailLoading = $state(false);
 
   async function showDetail(project: ProjectCard) {
     detailLoading = true;
@@ -351,7 +371,19 @@
         {#if searchQuery}<button class="hero-search-clear" onclick={() => searchQuery = ''}>✕</button>{/if}
       </div>
       <div class="hero-meta">
+        <!-- 工作空间选择器 -->
+        <div class="ws-selector">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <select class="ws-select" onchange={(e) => switchWorkspace((e.target as HTMLSelectElement).value)}>
+            {#each workspaces as ws}
+              <option value={ws.path} selected={ws.path === workspacePath}>{ws.name}</option>
+            {/each}
+          </select>
+        </div>
+        <span class="hero-dot">·</span>
         <span class="hero-count">{projects.length} 个项目</span>
+        <span class="hero-dot">·</span>
+        <a href="/settings" class="hero-link">管理工作空间</a>
         <span class="hero-dot">·</span>
         <button class="hero-create" onclick={openCreateModal}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新建项目</button>
       </div>
@@ -719,6 +751,53 @@
   .hero-create:hover {
     background: #eef2ff;
     color: #4f46e5;
+  }
+
+  .hero-link {
+    font-size: 14px;
+    font-weight: 500;
+    color: #94a3b8;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .hero-link:hover {
+    color: #667eea;
+  }
+
+  /* 工作空间选择器 */
+  .ws-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ws-selector svg {
+    color: #94a3b8;
+    flex-shrink: 0;
+  }
+
+  .ws-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .ws-select:hover {
+    background: #f1f5f9;
+  }
+
+  .ws-select:focus {
+    background: #eef2ff;
   }
 
   /* ========== 搜索无结果 ========== */

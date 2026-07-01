@@ -27,9 +27,16 @@ struct EditorSetting {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+struct WorkspaceConfig {
+    name: String,
+    path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct AppSettings {
     editor: EditorSetting,
-    workspace_path: Option<String>,
+    workspaces: Vec<WorkspaceConfig>,
+    active_workspace: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -39,7 +46,8 @@ impl Default for AppSettings {
                 name: "VS Code".to_string(),
                 command: "code".to_string(),
             },
-            workspace_path: None,
+            workspaces: Vec::new(),
+            active_workspace: None,
         }
     }
 }
@@ -449,6 +457,55 @@ fn save_settings(app: tauri::AppHandle, settings: AppSettings) -> Result<(), Str
     Ok(())
 }
 
+// ===== 工作空间管理 =====
+
+#[tauri::command]
+fn add_workspace(app: tauri::AppHandle, name: String, path: String) -> Result<AppSettings, String> {
+    let mut settings = get_settings(app.clone());
+    // 检查是否已存在相同路径
+    if settings.workspaces.iter().any(|w| w.path == path) {
+        return Err("该路径已是工作空间".to_string());
+    }
+    settings.workspaces.push(WorkspaceConfig {
+        name,
+        path: path.clone(),
+    });
+    // 如果是第一个工作空间，自动设为活跃
+    if settings.active_workspace.is_none() {
+        settings.active_workspace = Some(path);
+    }
+    let path = get_settings_path(&app)?;
+    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(settings)
+}
+
+#[tauri::command]
+fn remove_workspace(app: tauri::AppHandle, path: String) -> Result<AppSettings, String> {
+    let mut settings = get_settings(app.clone());
+    settings.workspaces.retain(|w| w.path != path);
+    if settings.active_workspace.as_ref() == Some(&path) {
+        settings.active_workspace = settings.workspaces.first().map(|w| w.path.clone());
+    }
+    let save_path = get_settings_path(&app)?;
+    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    fs::write(&save_path, json).map_err(|e| e.to_string())?;
+    Ok(settings)
+}
+
+#[tauri::command]
+fn set_active_workspace(app: tauri::AppHandle, path: String) -> Result<AppSettings, String> {
+    let mut settings = get_settings(app.clone());
+    if !settings.workspaces.iter().any(|w| w.path == path) {
+        return Err("工作空间不存在".to_string());
+    }
+    settings.active_workspace = Some(path);
+    let save_path = get_settings_path(&app)?;
+    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    fs::write(&save_path, json).map_err(|e| e.to_string())?;
+    Ok(settings)
+}
+
 // ===== 命令：在编辑器中打开项目 =====
 
 #[tauri::command]
@@ -542,6 +599,9 @@ pub fn run() {
             list_skills,
             delete_skill,
             get_project_detail,
+            add_workspace,
+            remove_workspace,
+            set_active_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

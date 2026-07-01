@@ -10,7 +10,13 @@
 
   interface AppSettings {
     editor: EditorSetting;
-    workspace_path: string | null;
+    workspaces: WorkspaceConfig[];
+    active_workspace: string | null;
+  }
+
+  interface WorkspaceConfig {
+    name: string;
+    path: string;
   }
 
   // ===== 状态 =====
@@ -24,7 +30,8 @@
   let testMessage = $state('');
 
   // 工作空间状态
-  let workspacePath = $state<string | null>(null);
+  let workspaces = $state<WorkspaceConfig[]>([]);
+  let activeWorkspace = $state<string | null>(null);
 
   // ===== 加载设置 =====
   onMount(async () => {
@@ -35,7 +42,8 @@
       ]);
 
       editors = presetEditors;
-      workspacePath = settings.workspace_path;
+      workspaces = settings.workspaces;
+      activeWorkspace = settings.active_workspace;
 
       // 检查当前设置是否在预设中
       const match = presetEditors.find(e => e.command === settings.editor.command);
@@ -87,7 +95,8 @@
       await invoke('save_settings', {
         settings: {
           editor,
-          workspace_path: workspacePath
+          workspaces,
+          active_workspace: activeWorkspace
         }
       });
 
@@ -133,7 +142,7 @@
   );
 
   // ===== 选择工作空间目录 =====
-  async function selectWorkspaceFolder() {
+  async function addWorkspace() {
     try {
       const { open } = await import('@tauri-apps/plugin-dialog');
       const selected = await open({
@@ -143,18 +152,39 @@
       });
 
       if (selected) {
-        workspacePath = selected;
+        // 提取文件夹名作为默认名称
+        const name = selected.split('/').filter(Boolean).pop() || selected;
+        const result = await invoke<AppSettings>('add_workspace', { name, path: selected });
+        workspaces = result.workspaces;
+        activeWorkspace = result.active_workspace ?? null;
         saved = false;
       }
     } catch (e) {
-      console.error('选择文件夹失败:', e);
+      console.error('添加工作空间失败:', e);
     }
   }
 
-  // ===== 清除工作空间路径 =====
-  function clearWorkspacePath() {
-    workspacePath = null;
-    saved = false;
+  // ===== 删除工作空间 =====
+  async function removeWorkspace(path: string) {
+    try {
+      const result = await invoke<AppSettings>('remove_workspace', { path });
+      workspaces = result.workspaces;
+      activeWorkspace = result.active_workspace ?? null;
+      saved = false;
+    } catch (e) {
+      console.error('删除工作空间失败:', e);
+    }
+  }
+
+  // ===== 设为活跃 =====
+  async function setActiveWs(path: string) {
+    try {
+      const result = await invoke<AppSettings>('set_active_workspace', { path });
+      activeWorkspace = result.active_workspace ?? null;
+      saved = false;
+    } catch (e) {
+      console.error('设置活跃工作空间失败:', e);
+    }
   }
 </script>
 
@@ -276,26 +306,44 @@
     <div class="card-section-header">
       <div class="section-icon">📁</div>
       <div class="section-text">
-        <h3>工作空间目录</h3>
-        <p>选择一个文件夹作为工作空间，系统会自动扫描其中的所有子项目</p>
+        <h3>工作空间管理</h3>
+        <p>添加多个工作空间目录，在主页可一键切换</p>
       </div>
     </div>
 
-    {#if workspacePath}
-      <div class="current-path-display">
-        <div class="path-preview">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          <span>{workspacePath}</span>
-        </div>
-        <button class="btn-clear-path" onclick={clearWorkspacePath} title="清除工作空间路径">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+    {#if workspaces.length > 0}
+      <div class="ws-list">
+        {#each workspaces as ws}
+          <div class="ws-item" class:active={ws.path === activeWorkspace}>
+            <div class="ws-item-left">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <div class="ws-item-info">
+                <span class="ws-item-name">{ws.name}</span>
+                <span class="ws-item-path">{ws.path}</span>
+              </div>
+            </div>
+            <div class="ws-item-actions">
+              {#if ws.path !== activeWorkspace}
+                <button class="ws-btn-activate" onclick={() => setActiveWs(ws.path)} title="切换为此工作空间">切换</button>
+              {:else}
+                <span class="ws-badge-active">当前</span>
+              {/if}
+              <button class="ws-btn-remove" onclick={() => removeWorkspace(ws.path)} title="移除">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <div class="ws-empty">
+        <span>还没有添加任何工作空间</span>
       </div>
     {/if}
 
-    <button class="btn-select-folder" onclick={selectWorkspaceFolder}>
+    <button class="btn-select-folder" onclick={addWorkspace}>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      {workspacePath ? '更换目录' : '选择工作空间文件夹'}
+      添加工作空间
     </button>
   </div>
 
@@ -585,36 +633,108 @@
     margin-top: 24px;
   }
 
-  .current-path-display {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
-    padding: 10px 14px;
+  .ws-empty {
+    padding: 24px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 14px;
     background: #f8fafc;
     border-radius: 10px;
-    border: 1px solid #e2e8f0;
+    margin-bottom: 16px;
   }
 
-  .path-preview {
-    flex: 1;
+  .ws-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .ws-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: #475569;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    transition: all 0.2s;
+  }
+
+  .ws-item.active {
+    border-color: #667eea;
+    background: #eef2ff;
+  }
+
+  .ws-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .ws-item-left svg {
+    flex-shrink: 0;
+    color: #94a3b8;
+  }
+
+  .ws-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .ws-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  .ws-item-path {
+    font-size: 11px;
+    color: #94a3b8;
     font-family: ui-monospace, monospace;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .path-preview svg {
+  .ws-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     flex-shrink: 0;
-    color: #94a3b8;
   }
 
-  .btn-clear-path {
+  .ws-btn-activate {
+    padding: 4px 10px;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6366f1;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .ws-btn-activate:hover {
+    background: #e0e7ff;
+  }
+
+  .ws-badge-active {
+    font-size: 11px;
+    font-weight: 600;
+    color: #16a34a;
+    background: #f0fdf4;
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+
+  .ws-btn-remove {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -625,11 +745,10 @@
     color: #94a3b8;
     cursor: pointer;
     border-radius: 6px;
-    flex-shrink: 0;
     transition: all 0.2s;
   }
 
-  .btn-clear-path:hover {
+  .ws-btn-remove:hover {
     color: #dc2626;
     background: #fef2f2;
   }
@@ -640,19 +759,21 @@
     gap: 8px;
     padding: 12px 20px;
     background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    border: 1px dashed #e2e8f0;
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
     color: #475569;
     cursor: pointer;
     transition: all 0.2s;
+    width: 100%;
+    justify-content: center;
   }
 
   .btn-select-folder:hover {
     background: #eef2f6;
-    border-color: #cbd5e1;
-    color: #1e293b;
+    border-color: #667eea;
+    color: #6366f1;
   }
 
   /* ===== 全局保存栏 ===== */
