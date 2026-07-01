@@ -324,6 +324,8 @@ pub fn run() {
             save_settings,
             open_in_editor,
             get_preset_editors,
+            list_skills,
+            delete_skill,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -334,4 +336,140 @@ pub fn run() {
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+// ===== Skills 管理 =====
+
+#[derive(Debug, Serialize)]
+struct SkillCard {
+    name: String,
+    description: String,
+    path: String,
+    version: String,
+}
+
+/// 解析 SKILL.md 的 YAML frontmatter
+fn parse_skill_frontmatter(content: &str) -> (String, String, String) {
+    let mut name = String::new();
+    let mut description = String::new();
+    let mut version = String::new();
+
+    let content = content.trim();
+    if !content.starts_with("---") {
+        return (name, description, version);
+    }
+
+    let after_first = content.strip_prefix("---").unwrap_or("");
+    if let Some(end) = after_first.find("---") {
+        let frontmatter = &after_first[..end];
+        let mut in_description = false;
+        let mut desc_parts: Vec<String> = Vec::new();
+
+        for line in frontmatter.lines() {
+            if in_description {
+                let trimmed = line.trim();
+                if trimmed.is_empty()
+                    || !trimmed.starts_with(' ')
+                        && !trimmed.starts_with(|c: char| c.is_whitespace())
+                {
+                    // check if this is a new key
+                    if trimmed.contains(':') && !trimmed.starts_with(' ') {
+                        in_description = false;
+                        // parse as key... but just fall through
+                    } else {
+                        desc_parts.push(trimmed.to_string());
+                    }
+                } else {
+                    desc_parts.push(trimmed.to_string());
+                }
+                continue;
+            }
+
+            if let Some(val) = line.strip_prefix("name:") {
+                name = val.trim().trim_matches('"').to_string();
+            } else if let Some(val) = line.strip_prefix("description:") {
+                let val = val.trim();
+                if val.starts_with('"') {
+                    description = val.trim_matches('"').to_string();
+                } else if val.starts_with(">-") || val.starts_with('|') {
+                    in_description = true;
+                } else if !val.is_empty() {
+                    description = val.to_string();
+                } else {
+                    in_description = true;
+                }
+            } else if let Some(val) = line.strip_prefix("version:") {
+                version = val.trim().trim_matches('"').to_string();
+            }
+        }
+
+        if !desc_parts.is_empty() {
+            description = desc_parts.join(" ");
+        }
+    }
+
+    (name, description, version)
+}
+
+#[tauri::command]
+fn list_skills() -> Result<Vec<SkillCard>, String> {
+    let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
+    let skills_dir = home.join(".agents").join("skills");
+
+    if !skills_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let entries = fs::read_dir(&skills_dir).map_err(|e| format!("读取 skills 目录失败: {}", e))?;
+
+    let mut skills = Vec::new();
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
+        let entry_path = entry.path();
+
+        if !entry_path.is_dir() {
+            continue;
+        }
+
+        let folder_name = entry_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        if folder_name.starts_with('.') {
+            continue;
+        }
+
+        let skill_md_path = entry_path.join("SKILL.md");
+        let (name, description, version) = if skill_md_path.exists() {
+            match fs::read_to_string(&skill_md_path) {
+                Ok(content) => parse_skill_frontmatter(&content),
+                Err(_) => (folder_name.clone(), String::new(), String::new()),
+            }
+        } else {
+            (folder_name.clone(), String::new(), String::new())
+        };
+
+        skills.push(SkillCard {
+            name: if name.is_empty() { folder_name } else { name },
+            description,
+            path: entry_path.to_string_lossy().to_string(),
+            version,
+        });
+    }
+
+    skills.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(skills)
+}
+
+#[tauri::command]
+fn delete_skill(path: String) -> Result<(), String> {
+    let dir = Path::new(&path);
+    if !dir.exists() {
+        return Err("技能目录不存在".to_string());
+    }
+    fs::remove_dir_all(dir).map_err(|e| format!("删除失败: {}", e))?;
+    Ok(())
 }
