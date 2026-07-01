@@ -168,6 +168,203 @@ fn scan_sub_projects(project_dir: &Path) -> Vec<SubProject> {
     subs
 }
 
+// ===== 获取 Git 远程地址 =====
+
+fn get_git_remote_url(repo_path: &Path) -> Option<String> {
+    let output = Command::new("git")
+        .args([
+            "-C",
+            &repo_path.to_string_lossy(),
+            "remote",
+            "get-url",
+            "origin",
+        ])
+        .output()
+        .ok()?;
+    if output.status.success() {
+        let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !url.is_empty() {
+            Some(url)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+// ===== 项目详情 =====
+
+#[derive(Debug, Serialize)]
+struct GitRepo {
+    name: String,
+    path: String,
+    remote_url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SubDetail {
+    name: String,
+    path: String,
+    sub_type: String,
+    git_repo: Option<GitRepo>,
+    children: Vec<GitRepo>,
+}
+
+#[derive(Debug, Serialize)]
+struct ProjectDetail {
+    name: String,
+    path: String,
+    has_readme: bool,
+    readme_preview: String,
+    sub_items: Vec<SubDetail>,
+}
+
+#[tauri::command]
+fn get_project_detail(path: String) -> Result<ProjectDetail, String> {
+    let dir = Path::new(&path);
+    if !dir.is_dir() {
+        return Err("项目目录不存在".to_string());
+    }
+
+    let folder_name = dir
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    let readme_path = dir.join("README.md");
+    let (project_name, readme_preview, has_readme) = if readme_path.exists() {
+        match fs::read_to_string(&readme_path) {
+            Ok(content) => {
+                let first_line = content
+                    .lines()
+                    .next()
+                    .unwrap_or(&folder_name)
+                    .trim()
+                    .trim_start_matches("# ")
+                    .trim()
+                    .to_string();
+                let preview = content.chars().take(300).collect::<String>();
+                (
+                    if first_line.is_empty() {
+                        folder_name.clone()
+                    } else {
+                        first_line
+                    },
+                    preview,
+                    true,
+                )
+            }
+            Err(_) => (folder_name.clone(), String::new(), false),
+        }
+    } else {
+        (folder_name.clone(), String::new(), false)
+    };
+
+    // 扫描子目录
+    let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {}", e))?;
+    let mut sub_items = Vec::new();
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
+        let entry_path = entry.path();
+        if !entry_path.is_dir() {
+            continue;
+        }
+
+        let name = entry_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        let lower = name.to_lowercase();
+
+        if lower.starts_with("casp") {
+            let git_repo = get_git_remote_url(&entry_path).map(|url| GitRepo {
+                name: name.clone(),
+                path: entry_path.to_string_lossy().to_string(),
+                remote_url: Some(url),
+            });
+
+            // 对于 casp，如果没有 git 远程也显示一个不带远程的条目
+            if git_repo.is_none() {
+                // 也检查子目录是否有 .git
+                let has_git_dir = entry_path.join(".git").exists();
+                let repo = if has_git_dir {
+                    get_git_remote_url(&entry_path).map(|url| GitRepo {
+                        name: name.clone(),
+                        path: entry_path.to_string_lossy().to_string(),
+                        remote_url: Some(url),
+                    })
+                } else {
+                    None
+                };
+                sub_items.push(SubDetail {
+                    name: name.clone(),
+                    path: entry_path.to_string_lossy().to_string(),
+                    sub_type: "casp".to_string(),
+                    git_repo: repo,
+                    children: Vec::new(),
+                });
+            } else {
+                sub_items.push(SubDetail {
+                    name: name.clone(),
+                    path: entry_path.to_string_lossy().to_string(),
+                    sub_type: "casp".to_string(),
+                    git_repo,
+                    children: Vec::new(),
+                });
+            }
+        } else if lower.starts_with("ids") {
+            // 扫描 ids 的子目录
+            let mut children = Vec::new();
+            if let Ok(child_entries) = fs::read_dir(&entry_path) {
+                for child in child_entries.flatten() {
+                    let child_path = child.path();
+                    if !child_path.is_dir() {
+                        continue;
+                    }
+                    let child_name = child_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    if child_name.starts_with('.') {
+                        continue;
+                    }
+
+                    let remote_url = get_git_remote_url(&child_path);
+                    if let Some(url) = remote_url {
+                        children.push(GitRepo {
+                            name: child_name,
+                            path: child_path.to_string_lossy().to_string(),
+                            remote_url: Some(url),
+                        });
+                    }
+                }
+            }
+            sub_items.push(SubDetail {
+                name: name.clone(),
+                path: entry_path.to_string_lossy().to_string(),
+                sub_type: "ids".to_string(),
+                git_repo: None,
+                children,
+            });
+        }
+    }
+
+    sub_items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    Ok(ProjectDetail {
+        name: project_name,
+        path: dir.to_string_lossy().to_string(),
+        has_readme,
+        readme_preview,
+        sub_items,
+    })
+}
+
 // ===== 命令：创建新项目 =====
 
 #[tauri::command]
@@ -344,6 +541,7 @@ pub fn run() {
             get_preset_editors,
             list_skills,
             delete_skill,
+            get_project_detail,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

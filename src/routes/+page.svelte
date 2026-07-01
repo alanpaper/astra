@@ -169,6 +169,59 @@
       creating = false;
     }
   }
+
+  // ===== 项目详情 =====
+  interface GitRepo {
+    name: string;
+    path: string;
+    remote_url: string | null;
+  }
+
+  interface SubDetail {
+    name: string;
+    path: string;
+    sub_type: string;
+    git_repo: GitRepo | null;
+    children: GitRepo[];
+  }
+
+  interface ProjectDetail {
+    name: string;
+    path: string;
+    has_readme: boolean;
+    readme_preview: string;
+    sub_items: SubDetail[];
+  }
+
+  let selectedProject = $state<ProjectDetail | null>(null);
+  let detailLoading = $state(false);
+
+  async function showDetail(project: ProjectCard) {
+    detailLoading = true;
+    error = '';
+    try {
+      const detail = await invoke<ProjectDetail>('get_project_detail', { path: project.path });
+      selectedProject = detail;
+    } catch (e) {
+      error = `加载详情失败: ${e}`;
+    } finally {
+      detailLoading = false;
+    }
+  }
+
+  function backToWorkspace() {
+    selectedProject = null;
+  }
+
+  function openEditorForPath(path: string) {
+    if (!editorSetting.command) {
+      error = '请先在「设置」页面配置默认编辑器';
+      return;
+    }
+    invoke('open_in_editor', { path, editorCommand: editorSetting.command }).catch(e => {
+      error = `打开编辑器失败: ${e}`;
+    });
+  }
 </script>
 
 <div class="workspace-page">
@@ -207,37 +260,102 @@
     </div>
   {/if}
 
-  <!-- 扫描结果区域 -->
-  {#if !loading && workspacePath}
+  <!-- 工作空间内容区 -->
+  {#if selectedProject}
+    <!-- 项目详情视图 -->
+    <div class="detail-view">
+      <div class="detail-nav">
+        <button class="back-btn" onclick={backToWorkspace}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          返回
+        </button>
+      </div>
+      {#if detailLoading}
+        <div class="detail-loading">
+          <div class="spinner"></div>
+          <span>加载详情中...</span>
+        </div>
+      {:else}
+        <div class="detail-header">
+          <div class="detail-header-left">
+            <div class="detail-avatar" style="background: {folderColor(selectedProject.name)}22; color: {folderColor(selectedProject.name)}">{selectedProject.name.charAt(0).toUpperCase()}</div>
+            <div>
+              <h2 class="detail-title">{selectedProject.name}</h2>
+              <div class="detail-path" title={selectedProject.path}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <span>{selectedProject.path}</span>
+              </div>
+            </div>
+          </div>
+          <button class="editor-open-btn" onclick={function() { if (selectedProject) openEditorForPath(selectedProject.path); }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            在 {editorSetting.name || '编辑器'} 中打开
+          </button>
+        </div>
+        {#if selectedProject.readme_preview}
+          <div class="detail-readme">
+            <div class="section-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>README</span></div>
+            <pre class="readme-content">{selectedProject.readme_preview}</pre>
+          </div>
+        {/if}
+        {#if selectedProject.sub_items.length > 0}
+          <div class="detail-subs">
+            <div class="section-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>子项目 ({selectedProject.sub_items.length})</span></div>
+            <div class="sub-detail-list">
+              {#each selectedProject.sub_items as item}
+                <div class="sub-detail-card" class:casp={item.sub_type === 'casp'} class:ids={item.sub_type === 'ids'}>
+                  <div class="sub-detail-header">
+                    <span class="sub-detail-icon">{item.sub_type === 'casp' ? '📦' : '📋'}</span>
+                    <span class="sub-detail-name">{item.name}</span>
+                    <span class="sub-type-badge" class:casp-badge={item.sub_type === 'casp'} class:ids-badge={item.sub_type === 'ids'}>{item.sub_type === 'casp' ? 'CASP' : 'IDS'}</span>
+                  </div>
+                  {#if item.sub_type === 'casp'}
+                    {#if item.git_repo}
+                      <div class="git-info"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg><a class="git-url" href={item.git_repo.remote_url || '#'} target="_blank" rel="noreferrer">{item.git_repo.remote_url}</a></div>
+                    {:else}
+                      <div class="git-info no-remote"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>未检测到 Git 远程仓库</span></div>
+                    {/if}
+                    <button class="sub-open-btn" onclick={() => openEditorForPath(item.path)}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>打开</button>
+                  {/if}
+                  {#if item.sub_type === 'ids' && item.children.length > 0}
+                    <div class="ids-children">
+                      {#each item.children as child}
+                        <div class="ids-child-item">
+                          <div class="child-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span class="child-name">{child.name}</span><button class="sub-open-btn small" onclick={() => openEditorForPath(child.path)}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>打开</button></div>
+                          {#if child.remote_url}
+                            <div class="git-info"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg><a class="git-url" href={child.remote_url} target="_blank" rel="noreferrer">{child.remote_url}</a></div>
+                          {:else}
+                            <div class="git-info no-remote"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>无远程仓库</span></div>
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  {:else if item.sub_type === 'ids' && item.children.length === 0}
+                    <div class="git-info no-remote"><span>该 IDS 目录下没有子项目</span></div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <div class="no-subs"><span class="no-subs-icon">📭</span><p>该项目下没有 casp 或 ids 子目录</p></div>
+        {/if}
+      {/if}
+    </div>
+  {:else if !loading && workspacePath}
     <!-- 居中搜索区 -->
     <div class="hero-search">
       <div class="hero-search-inner">
-        <div class="hero-search-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </div>
-        <input
-          type="text"
-          class="hero-search-input"
-          placeholder="搜索项目名称..."
-          bind:value={searchQuery}
-          use:focusOnMount
-        />
-        {#if searchQuery}
-          <button class="hero-search-clear" onclick={() => searchQuery = ''}>
-            ✕
-          </button>
-        {/if}
+        <div class="hero-search-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+        <input type="text" class="hero-search-input" placeholder="搜索项目名称..." bind:value={searchQuery} use:focusOnMount />
+        {#if searchQuery}<button class="hero-search-clear" onclick={() => searchQuery = ''}>✕</button>{/if}
       </div>
       <div class="hero-meta">
         <span class="hero-count">{projects.length} 个项目</span>
         <span class="hero-dot">·</span>
-        <button class="hero-create" onclick={openCreateModal}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          新建项目
-        </button>
+        <button class="hero-create" onclick={openCreateModal}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新建项目</button>
       </div>
     </div>
-
     <!-- 搜索无结果 -->
     {#if filteredProjects.length === 0 && projects.length > 0}
       <div class="no-results">
@@ -246,57 +364,34 @@
         <p>尝试使用不同的关键词搜索，或 <button class="link-btn" onclick={() => searchQuery = ''}>清除搜索</button></p>
       </div>
     {/if}
-
     <!-- 项目卡片网格 -->
     {#if filteredProjects.length > 0}
-      <div class="card-grid" style="--card-count: {filteredProjects.length}">
+      <div class="card-grid">
         {#each filteredProjects as project (project.path)}
-          <div class="project-card" style="--card-accent: {folderColor(project.name)}" onclick={() => openProject(project.path)} onkeydown={(e) => e.key === 'Enter' && openProject(project.path)} role="button" tabindex="0" title="在 {editorSetting.name || '编辑器'} 中打开">
+          <div class="project-card" style="--card-accent: {folderColor(project.name)}" onclick={() => showDetail(project)} onkeydown={(e) => e.key === 'Enter' && showDetail(project)} role="button" tabindex="0" title="查看项目详情">
             <div class="card-accent-bar"></div>
             <div class="card-content">
               <div class="card-header">
-                <div class="card-avatar" style="background: {folderColor(project.name)}22; color: {folderColor(project.name)}">
-                  {project.name.charAt(0).toUpperCase()}
-                </div>
+                <div class="card-avatar" style="background: {folderColor(project.name)}22; color: {folderColor(project.name)}">{project.name.charAt(0).toUpperCase()}</div>
                 <div class="card-header-text">
                   <h3 class="card-title">{@html highlight(project.name)}</h3>
                   <span class="card-folder">{@html highlight(folderName(project.path))}</span>
                 </div>
               </div>
-
-              <div class="card-path" title={project.path}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                <span>{project.path}</span>
-              </div>
-
+              <div class="card-path" title={project.path}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>{project.path}</span></div>
               {#if project.sub_projects?.length > 0}
                 <div class="sub-projects">
-                  <div class="sub-label">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                    <span>子项目 ({project.sub_projects.length})</span>
-                  </div>
+                  <div class="sub-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>子项目 ({project.sub_projects.length})</span></div>
                   <div class="sub-list">
                     {#each project.sub_projects as sub}
-                      <button
-                        class="sub-item"
-                        onclick={(e) => { e.stopPropagation(); openProject(sub.path); }}
-                        title="在 {editorSetting.name || '编辑器'} 中打开 {sub.name}"
-                      >
-                        <span class="sub-item-name">{sub.name}</span>
-                      </button>
+                      <button class="sub-item" onclick={(e) => { e.stopPropagation(); openProject(sub.path); }} title="在 {editorSetting.name || '编辑器'} 中打开 {sub.name}"><span class="sub-item-name">{sub.name}</span></button>
                     {/each}
                   </div>
                 </div>
               {/if}
-
               <div class="card-footer">
                 <div class="footer-right">
-                  <span class="open-hint">
-                    {#if editorSetting.command}
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                      在 {editorSetting.name} 中打开
-                    {/if}
-                  </span>
+                  <button class="open-editor-btn" onclick={(e) => { e.stopPropagation(); openProject(project.path); }} title="在 {editorSetting.name || '编辑器'} 中打开"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>打开</button>
                 </div>
               </div>
             </div>
@@ -304,18 +399,15 @@
         {/each}
       </div>
     {/if}
-
-    <!-- 空工作空间（无项目） -->
-      {#if projects.length === 0 && !loading}
-        <div class="empty-state">
-          <div class="empty-illustration">
-            <span class="empty-icon">📭</span>
-          </div>
-          <h3>这里还没有项目</h3>
-          <p>该目录下没有找到任何子文件夹</p>
-        </div>
-      {/if}
+    <!-- 空工作空间 -->
+    {#if projects.length === 0}
+      <div class="empty-state">
+        <div class="empty-illustration"><span class="empty-icon">📭</span></div>
+        <h3>这里还没有项目</h3>
+        <p>该目录下没有找到任何子文件夹</p>
+      </div>
     {/if}
+  {/if}
 
     <!-- ===== 新建项目弹窗 ===== -->
     {#if showCreateModal}
@@ -865,20 +957,6 @@
     align-items: center;
   }
 
-  .open-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: #a0aec0;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-
-  .project-card:hover .open-hint {
-    opacity: 1;
-  }
-
   /* ========== 空状态 ========== */
   .empty-state {
     text-align: center;
@@ -910,6 +988,386 @@
   }
 
   .empty-state p {
+    color: #94a3b8;
+    font-size: 14px;
+  }
+
+  /* ========== 卡片打开按钮 ========== */
+  .open-editor-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    opacity: 0;
+  }
+
+  .project-card:hover .open-editor-btn {
+    opacity: 1;
+  }
+
+  .open-editor-btn:hover {
+    background: #eef2f6;
+    color: #1e293b;
+  }
+
+  /* ========== 项目详情视图 ========== */
+  .detail-view {
+    animation: fadeIn 0.3s ease;
+  }
+
+  .detail-nav {
+    margin-bottom: 20px;
+  }
+
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .back-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+  }
+
+  .detail-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px;
+    color: #64748b;
+  }
+
+  .detail-loading .spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 20px 24px;
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #f1f5f9;
+    flex-wrap: wrap;
+  }
+
+  .detail-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .detail-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .detail-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 4px;
+  }
+
+  .detail-path {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+    font-family: ui-monospace, monospace;
+    max-width: 500px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .detail-path svg {
+    flex-shrink: 0;
+  }
+
+  .detail-path span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .editor-open-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+  }
+
+  .editor-open-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+
+  /* 区域标题 */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 14px;
+  }
+
+  .section-title svg {
+    color: #94a3b8;
+    flex-shrink: 0;
+  }
+
+  /* README 预览 */
+  .detail-readme {
+    margin-bottom: 24px;
+    padding: 20px;
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #f1f5f9;
+  }
+
+  .readme-content {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    font-family: ui-monospace, monospace;
+    overflow-x: auto;
+  }
+
+  /* 子项目列表 */
+  .detail-subs {
+    margin-bottom: 24px;
+  }
+
+  .sub-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sub-detail-card {
+    padding: 18px 20px;
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #f1f5f9;
+    border-left: 4px solid #e2e8f0;
+    transition: all 0.2s ease;
+  }
+
+  .sub-detail-card.casp {
+    border-left-color: #3b82f6;
+  }
+
+  .sub-detail-card.ids {
+    border-left-color: #8b5cf6;
+  }
+
+  .sub-detail-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+
+  .sub-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .sub-detail-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .sub-detail-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    font-family: ui-monospace, monospace;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sub-type-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .casp-badge {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+
+  .ids-badge {
+    background: #f5f3ff;
+    color: #7c3aed;
+  }
+
+  .git-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #475569;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #f1f5f9;
+    margin-bottom: 8px;
+  }
+
+  .git-info svg {
+    flex-shrink: 0;
+    color: #94a3b8;
+  }
+
+  .git-info.no-remote {
+    color: #94a3b8;
+  }
+
+  .git-url {
+    color: #3b82f6;
+    text-decoration: none;
+    font-family: ui-monospace, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .git-url:hover {
+    text-decoration: underline;
+    color: #2563eb;
+  }
+
+  .sub-open-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .sub-open-btn:hover {
+    background: #eef2f6;
+    color: #1e293b;
+  }
+
+  .sub-open-btn.small {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  /* IDS 子目录列表 */
+  .ids-children {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ids-child-item {
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #f1f5f9;
+  }
+
+  .child-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .child-header svg {
+    flex-shrink: 0;
+    color: #94a3b8;
+  }
+
+  .child-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    font-family: ui-monospace, monospace;
+    flex: 1;
+  }
+
+  .no-subs {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #f1f5f9;
+  }
+
+  .no-subs-icon {
+    font-size: 40px;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .no-subs p {
     color: #94a3b8;
     font-size: 14px;
   }
