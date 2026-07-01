@@ -217,6 +217,7 @@ struct SubDetail {
     sub_type: String,
     git_repo: Option<GitRepo>,
     children: Vec<GitRepo>,
+    readme_preview: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -226,6 +227,17 @@ struct ProjectDetail {
     has_readme: bool,
     readme_preview: String,
     sub_items: Vec<SubDetail>,
+}
+
+fn read_readme_preview(dir: &Path) -> String {
+    let readme_path = dir.join("README.md");
+    if !readme_path.exists() {
+        return String::new();
+    }
+    match fs::read_to_string(&readme_path) {
+        Ok(content) => content.chars().take(1000).collect::<String>(),
+        Err(_) => String::new(),
+    }
 }
 
 #[tauri::command]
@@ -314,6 +326,7 @@ fn get_project_detail(path: String) -> Result<ProjectDetail, String> {
                     sub_type: "casp".to_string(),
                     git_repo: repo,
                     children: Vec::new(),
+                    readme_preview: read_readme_preview(&entry_path),
                 });
             } else {
                 sub_items.push(SubDetail {
@@ -322,6 +335,7 @@ fn get_project_detail(path: String) -> Result<ProjectDetail, String> {
                     sub_type: "casp".to_string(),
                     git_repo,
                     children: Vec::new(),
+                    readme_preview: read_readme_preview(&entry_path),
                 });
             }
         } else if lower.starts_with("ids") {
@@ -358,6 +372,7 @@ fn get_project_detail(path: String) -> Result<ProjectDetail, String> {
                 sub_type: "ids".to_string(),
                 git_repo: None,
                 children,
+                readme_preview: read_readme_preview(&entry_path),
             });
         }
     }

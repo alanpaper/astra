@@ -226,6 +226,7 @@
     sub_type: string;
     git_repo: GitRepo | null;
     children: GitRepo[];
+    readme_preview: string;
   }
 
   interface ProjectDetail {
@@ -237,6 +238,8 @@
   }
 
   async function showDetail(project: ProjectCard) {
+    // 滚动到顶部
+    document.querySelector('.content')?.scrollTo(0, 0);
     detailLoading = true;
     error = '';
     try {
@@ -251,6 +254,7 @@
 
   function backToWorkspace() {
     selectedProject = null;
+    document.querySelector('.content')?.scrollTo(0, 0);
   }
 
   function openEditorForPath(path: string) {
@@ -348,6 +352,7 @@
                     <span class="sub-detail-icon">{item.sub_type === 'casp' ? '📦' : '📋'}</span>
                     <span class="sub-detail-name">{item.name}</span>
                     <span class="sub-type-badge" class:casp-badge={item.sub_type === 'casp'} class:ids-badge={item.sub_type === 'ids'}>{item.sub_type === 'casp' ? 'CASP' : 'IDS'}</span>
+                    <button class="sub-open-btn" onclick={() => openEditorForPath(item.path)}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>打开</button>
                   </div>
                   {#if item.sub_type === 'casp'}
                     {#if item.git_repo}
@@ -355,7 +360,6 @@
                     {:else}
                       <div class="git-info no-remote"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>未检测到 Git 远程仓库</span></div>
                     {/if}
-                    <button class="sub-open-btn" onclick={() => openEditorForPath(item.path)}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>打开</button>
                   {/if}
                   {#if item.sub_type === 'ids' && item.children.length > 0}
                     <div class="ids-children">
@@ -372,6 +376,12 @@
                     </div>
                   {:else if item.sub_type === 'ids' && item.children.length === 0}
                     <div class="git-info no-remote"><span>该 IDS 目录下没有子项目</span></div>
+                  {/if}
+                  {#if item.readme_preview}
+                    <div class="sub-readme">
+                      <div class="sub-readme-header"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>README</span></div>
+                      <pre class="sub-readme-content">{item.readme_preview}</pre>
+                    </div>
                   {/if}
                 </div>
               {/each}
@@ -1416,6 +1426,40 @@
   .sub-open-btn.small {
     padding: 3px 8px;
     font-size: 11px;
+  }
+
+  /* 子项目 README */
+  .sub-readme {
+    margin: 8px 0;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #f1f5f9;
+  }
+
+  .sub-readme-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  .sub-readme-header svg {
+    flex-shrink: 0;
+  }
+
+  .sub-readme-content {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    font-family: ui-monospace, monospace;
+    margin: 0;
   }
 
   /* IDS 子目录列表 */
