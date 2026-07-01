@@ -256,8 +256,26 @@ fn save_settings(app: tauri::AppHandle, settings: AppSettings) -> Result<(), Str
 
 #[tauri::command]
 fn open_in_editor(path: String, editor_command: String) -> Result<(), String> {
+    // 打包后 PATH 可能不完整，补充常见编辑器安装路径
+    let existing_path = std::env::var("PATH").unwrap_or_default();
+    let extra_paths = [
+        "/usr/local/bin",
+        "/opt/homebrew/bin",
+        "/opt/local/bin",
+        "/usr/bin",
+        "/bin",
+    ];
+    let full_path = if existing_path.is_empty() {
+        extra_paths.join(":")
+    } else {
+        let mut parts: Vec<&str> = extra_paths.iter().map(|s| *s).collect();
+        parts.push(&existing_path);
+        parts.join(":")
+    };
+
     Command::new(&editor_command)
         .arg(&path)
+        .env("PATH", &full_path)
         .spawn()
         .map_err(|e| {
             format!(

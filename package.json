@@ -1,7 +1,7 @@
 {
-  "name": "aitool",
+  "name": "xingye",
   "version": "0.1.0",
-  "description": "",
+  "description": "星野 - 项目工作空间管理工具",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

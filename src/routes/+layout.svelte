@@ -55,7 +55,7 @@
   <!-- 侧边栏 -->
   <aside class="sidebar" class:open={sidebarOpen}>
     <div class="sidebar-header">
-      <h2>AiTool</h2>
+      <h2>星野</h2>
       <button class="collapse-btn" onclick={toggleCollapse} title="收起侧边栏" aria-label="收起侧边栏">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
