@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write # ✅ 关键修复
+
 jobs:
   build:
     strategy:
@@ -22,31 +25,22 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # ================= FIX 1: LOCK PNPM VERSION =================
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.12.0 # ✅ 固定版本（关键修复）
+          version: 9.12.0
 
-      # ================= NODE =================
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
 
-      # ================= FIX 2: DISABLE STRICT POLICY =================
-      - name: Disable pnpm build security policy
-        run: pnpm config set enable-pre-post-scripts true
-
-      # ================= INSTALL =================
-      - name: Install dependencies
+      - name: Install deps
         run: pnpm install --frozen-lockfile --unsafe-perm
 
-      # ================= RUST =================
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -55,11 +49,9 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
-      # ================= BUILD =================
-      - name: Build Tauri App
+      - name: Build
         run: pnpm tauri build --target ${{ matrix.target }}
 
-      # ================= RELEASE =================
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -69,7 +61,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= MAC =================
       - name: Upload DMG
         if: matrix.platform == 'macos'
         uses: softprops/action-gh-release@v2
@@ -79,7 +70,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= WINDOWS =================
       - name: Upload EXE
         if: matrix.platform == 'windows'
         uses: softprops/action-gh-release@v2
