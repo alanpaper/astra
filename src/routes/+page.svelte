@@ -127,6 +127,11 @@
     return colors[Math.abs(hash) % colors.length];
   }
 
+  // ===== 自动聚焦搜索框 =====
+  function focusOnMount(node: HTMLInputElement) {
+    node.focus();
+  }
+
   // ===== 新建项目弹窗状态 =====
   let showCreateModal = $state(false);
   let newFolderName = $state('');
@@ -204,36 +209,31 @@
 
   <!-- 扫描结果区域 -->
   {#if !loading && workspacePath}
-    <!-- 搜索栏 -->
-    <div class="toolbar">
-      <div class="project-count">
-        <span class="count-number">{projects.length}</span>
-        <span class="count-label">个项目</span>
-      </div>
-
-      <div class="search-filter">
-        <!-- 搜索输入 -->
-        <div class="search-box">
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input
-            type="text"
-            class="search-input"
-            placeholder="搜索项目名称或路径..."
-            bind:value={searchQuery}
-          />
-          {#if searchQuery}
-            <button class="search-clear" onclick={() => searchQuery = ''}>
-              ✕
-            </button>
-          {/if}
+    <!-- 居中搜索区 -->
+    <div class="hero-search">
+      <div class="hero-search-inner">
+        <div class="hero-search-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </div>
-
-        <!-- 新建项目 -->
-        <button class="btn-create" onclick={openCreateModal}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span>新建</span>
+        <input
+          type="text"
+          class="hero-search-input"
+          placeholder="搜索项目名称..."
+          bind:value={searchQuery}
+          use:focusOnMount
+        />
+        {#if searchQuery}
+          <button class="hero-search-clear" onclick={() => searchQuery = ''}>
+            ✕
+          </button>
+        {/if}
+      </div>
+      <div class="hero-meta">
+        <span class="hero-count">{projects.length} 个项目</span>
+        <span class="hero-dot">·</span>
+        <button class="hero-create" onclick={openCreateModal}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          新建项目
         </button>
       </div>
     </div>
@@ -378,7 +378,6 @@
 
 <style>
   .workspace-page {
-    max-width: 1100px;
     margin: 0 auto;
     animation: fadeIn 0.3s ease;
   }
@@ -525,102 +524,120 @@
     font-size: 13px;
   }
 
-  /* ========== 工具栏 ========== */
-  .toolbar {
+  /* ========== 居中搜索区 ========== */
+  .hero-search {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px 40px;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .hero-search-inner {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-  }
-
-  .project-count {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: #64748b;
-    font-size: 14px;
-  }
-
-  .count-number {
-    font-size: 20px;
-    font-weight: 700;
-    color: #1e293b;
-  }
-
-  .count-label {
-    color: #94a3b8;
-  }
-
-  .search-filter {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  /* 搜索框 */
-  .search-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    gap: 14px;
+    width: 100%;
+    max-width: 560px;
+    padding: 16px 24px;
     background: white;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 8px 14px;
-    min-width: 260px;
-    transition: all 0.2s;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04);
+    transition: all 0.3s ease;
   }
 
-  .search-box:focus-within {
+  .hero-search-inner:focus-within {
     border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08), 0 8px 32px rgba(102, 126, 234, 0.12);
   }
 
-  .search-icon {
+  .hero-search-icon {
     color: #94a3b8;
     flex-shrink: 0;
+    display: flex;
   }
 
-  .search-input {
+  .hero-search-input {
     flex: 1;
     border: none;
     outline: none;
-    font-size: 14px;
+    font-size: 20px;
+    font-weight: 500;
     color: #1e293b;
     background: none;
     min-width: 0;
   }
 
-  .search-input::placeholder {
-    color: #94a3b8;
+  .hero-search-input::placeholder {
+    color: #cbd5e1;
+    font-weight: 400;
   }
 
-  .search-clear {
+  .hero-search-clear {
     background: none;
     border: none;
     color: #94a3b8;
     cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 18px;
     flex-shrink: 0;
+    transition: all 0.2s;
   }
 
-  .search-clear:hover {
+  .hero-search-clear:hover {
     color: #475569;
     background: #f1f5f9;
+  }
+
+  .hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 14px;
+    color: #94a3b8;
+  }
+
+  .hero-count {
+    font-weight: 500;
+  }
+
+  .hero-dot {
+    color: #e2e8f0;
+  }
+
+  .hero-create {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    color: #667eea;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+
+  .hero-create:hover {
+    background: #eef2ff;
+    color: #4f46e5;
   }
 
   /* ========== 搜索无结果 ========== */
   .no-results {
     text-align: center;
-    padding: 48px 20px;
+    padding: 40px 20px;
     background: white;
     border-radius: 14px;
     border: 1px solid #f1f5f9;
+    margin: 8px auto;
+    max-width: 1100px;
   }
 
   .no-results-icon {
@@ -660,6 +677,9 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 16px;
+    padding: 12px 32px 32px;
+    max-width: 1100px;
+    margin: 0 auto;
     animation: fadeIn 0.4s ease;
   }
 
@@ -892,32 +912,6 @@
   .empty-state p {
     color: #94a3b8;
     font-size: 14px;
-  }
-
-  /* ========== 新建按钮 ========== */
-  .btn-create {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border: none;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    color: white;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-  }
-
-  .btn-create:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  }
-
-  .btn-create:active {
-    transform: translateY(0);
   }
 
   /* ========== 弹窗遮罩 ========== */
