@@ -158,7 +158,7 @@
       const newProject = await invoke<ProjectCard>('create_project', {
         workspacePath: workspacePath,
         folderName: folder,
-        projectName: newProjectName.trim() || folder
+        projectName: newProjectName.trim()
       });
       projects = [...projects, newProject];
       projects.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
@@ -343,16 +343,16 @@
               <p class="form-hint">将在当前工作空间下创建此名称的子文件夹</p>
             </div>
             <div class="form-group">
-              <label for="project-name">项目名称 <span class="optional">(可选)</span></label>
+              <label for="project-name">项目名称 <span class="required">*</span></label>
               <input
                 id="project-name"
                 type="text"
-                placeholder="留空则使用文件夹名称"
+                placeholder="输入项目显示名称"
                 bind:value={newProjectName}
                 disabled={creating}
                 onkeydown={(e) => e.key === 'Enter' && createNewProject()}
               />
-              <p class="form-hint">将写入 README.md 作为项目标题</p>
+              <p class="form-hint">项目 README.md 的标题</p>
             </div>
           </div>
           <div class="modal-footer">
@@ -360,7 +360,7 @@
             <button
               class="btn-confirm"
               onclick={createNewProject}
-              disabled={!newFolderName.trim() || creating}
+              disabled={!newFolderName.trim() || !newProjectName.trim() || creating}
             >
               {#if creating}
                 <div class="btn-spinner"></div>
@@ -1003,12 +1003,6 @@
 
   .required {
     color: #ef4444;
-  }
-
-  .optional {
-    font-weight: 400;
-    color: #94a3b8;
-    font-size: 13px;
   }
 
   .form-group input {
