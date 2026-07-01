@@ -25,6 +25,7 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
+      # ================= CHECKOUT =================
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -34,15 +35,20 @@ jobs:
         with:
           version: latest
 
-      # ================= NODE (LATEST) =================
-      - name: Setup Node.js (latest)
+      # ================= NODE =================
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: latest
           cache: pnpm
 
+      # ================= FIX PNPM BUILD SCRIPTS ISSUE =================
+      - name: Enable pnpm build scripts
+        run: pnpm config set ignore-scripts false
+
+      # ================= INSTALL =================
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --unsafe-perm
 
       # ================= RUST =================
       - name: Setup Rust
@@ -58,7 +64,7 @@ jobs:
         run: pnpm tauri build --target ${{ matrix.target }}
 
       # ================= CREATE RELEASE =================
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
