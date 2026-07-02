@@ -25,7 +25,6 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      # ================= CHECKOUT =================
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -35,17 +34,11 @@ jobs:
         with:
           node-version: 20
 
-      # ================= PNPM (CRITICAL FIX) =================
+      # ================= PNPM =================
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v2
         with:
-          version: 9
-          run_install: false
-
-      - name: Verify pnpm
-        run: |
-          node -v
-          pnpm -v
+          version: 8
 
       # ================= INSTALL =================
       - name: Install dependencies
@@ -62,11 +55,10 @@ jobs:
 
       # ================= BUILD =================
       - name: Build Tauri App
-        run: pnpm tauri build
+        run: pnpm tauri build -- --target ${{ matrix.target }}
 
-      # ================= CREATE RELEASE (ONLY ONCE) =================
-      - name: Create GitHub Release
-        if: matrix.platform == 'macos'
+      # ================= RELEASE =================
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -75,22 +67,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= UPLOAD MAC =================
+      # ================= MAC =================
       - name: Upload DMG
         if: matrix.platform == 'macos'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/release/bundle/dmg/*.dmg
+          files: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= UPLOAD WINDOWS =================
+      # ================= WINDOWS =================
       - name: Upload EXE
         if: matrix.platform == 'windows'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/release/bundle/nsis/*.exe
+          files: src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
