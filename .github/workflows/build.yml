@@ -25,24 +25,27 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      # ================= CODE =================
+      # ================= CHECKOUT =================
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ================= NODE + PNPM =================
+      # ================= NODE =================
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
-      - name: Enable Corepack (pnpm)
-        run: corepack enable
-
+      # ================= PNPM =================
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
+
+      - name: Verify pnpm
+        run: |
+          node -v
+          pnpm -v
 
       # ================= INSTALL =================
       - name: Install dependencies
@@ -61,7 +64,7 @@ jobs:
       - name: Build Tauri App
         run: pnpm tauri build -- --target ${{ matrix.target }}
 
-      # ================= RELEASE =================
+      # ================= RELEASE (CREATE ONCE) =================
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -71,7 +74,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= MAC =================
+      # ================= MAC DMG =================
       - name: Upload DMG
         if: matrix.platform == 'macos'
         uses: softprops/action-gh-release@v2
@@ -81,7 +84,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= WINDOWS =================
+      # ================= WINDOWS EXE =================
       - name: Upload EXE
         if: matrix.platform == 'windows'
         uses: softprops/action-gh-release@v2
