@@ -29,6 +29,21 @@
     sidebarCollapsed = !sidebarCollapsed;
   }
 
+  // ===== 窗口拖拽 =====
+  function windowDrag(node: HTMLElement) {
+    function onMousedown(e: MouseEvent) {
+      if (e.button === 0) {
+        invoke('drag_window');
+      }
+    }
+    node.addEventListener('mousedown', onMousedown);
+    return {
+      destroy() {
+        node.removeEventListener('mousedown', onMousedown);
+      }
+    };
+  }
+
   // ===== 全局快捷键 =====
   onMount(() => {
     function handleGlobalKeydown(e: KeyboardEvent) {
@@ -53,8 +68,8 @@
 </script>
 
 <div class="app-layout" class:collapsed={sidebarCollapsed}>
-  <!-- 顶部标题栏 -->
-  <header class="title-bar" data-tauri-drag-region>
+  <!-- 顶部标题栏（可拖拽） -->
+  <header use:windowDrag class="title-bar">
     <span class="title-bar-title">星野</span>
   </header>
 
@@ -179,7 +194,7 @@
     z-index: 999;
   }
 
-  /* ===== 顶部标题栏 ===== */
+  /* ===== 顶部标题栏（可拖拽） ===== */
   .title-bar {
     height: 38px;
     background: var(--sidebar-bg);
@@ -210,6 +225,8 @@
     flex-shrink: 0;
     transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   /* 收起状态：VS Code 风格，只保留图标宽度 */

@@ -536,6 +536,19 @@ fn minimize_to_tray(window: tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+// ===== 命令：窗口拖拽 =====
+
+#[tauri::command]
+fn drag_window(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "主窗口未找到".to_string())?;
+    window
+        .start_dragging()
+        .map_err(|e| format!("拖拽失败: {}", e))?;
+    Ok(())
+}
+
 // ===== 命令：获取预定义编辑器列表 =====
 
 #[tauri::command]
@@ -669,6 +682,7 @@ pub fn run() {
             remove_workspace,
             set_active_workspace,
             minimize_to_tray,
+            drag_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
