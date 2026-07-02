@@ -23,10 +23,53 @@ jobs:
             platform: windows
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ================= 从 git tag 提取版本 =================
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${{ github.ref_name }}
+          VERSION=${TAG#v}  # 移除 'v' 前缀
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+        shell: bash
+
+      # ================= 更新 tauri.conf.json =================
+      - name: Update tauri.conf.json version
+        run: |
+          python3 << 'EOF'
+          import json
+          version = "${{ steps.version.outputs.version }}"
+          with open('src-tauri/tauri.conf.json', 'r', encoding='utf-8') as f:
+              config = json.load(f)
+          config['version'] = version
+          with open('src-tauri/tauri.conf.json', 'w', encoding='utf-8') as f:
+              json.dump(config, f, ensure_ascii=False, indent=2)
+          print(f"Updated tauri.conf.json to version {version}")
+          EOF
+        shell: bash
+
+      # ================= 更新 Cargo.toml =================
+      - name: Update Cargo.toml version
+        run: |
+          python3 << 'EOF'
+          import re
+          version = "${{ steps.version.outputs.version }}"
+
+          # 更新 src-tauri/Cargo.toml
+          with open('src-tauri/Cargo.toml', 'r', encoding='utf-8') as f:
+              content = f.read()
+          content = re.sub(r'version\s*=\s*"[^"]*"', f'version = "{version}"', content, count=1)
+          with open('src-tauri/Cargo.toml', 'w', encoding='utf-8') as f:
+              f.write(content)
+          print(f"Updated Cargo.toml to version {version}")
+          EOF
+        shell: bash
 
       # ================= NODE =================
       - name: Setup Node.js
@@ -40,10 +83,6 @@ jobs:
         with:
           version: 10
 
-      # ================= INSTALL =================
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       # ================= RUST =================
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -54,45 +93,64 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           cache-all-crates: true
+          save-if: ${{ github.event_name == 'push' }}
 
       # ================= WINDOWS DEPENDENCIES =================
       - name: Install Windows build dependencies
         if: matrix.platform == 'windows'
-        run: |
-          choco install wixtoolset -y
-          refreshenv
         shell: pwsh
+        run: |
+          # Install WIX Toolset
+          choco install wixtoolset -y --no-progress
+          # Refresh environment
+          refreshenv
+          # Add WIX to PATH if needed
+          $WixPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+          if (Test-Path $WixPath) {
+            [Environment]::SetEnvironmentVariable("Path", $env:Path + ";$WixPath", "User")
+            $env:Path += ";$WixPath"
+          }
+
+      # ================= INSTALL DEPENDENCIES =================
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       # ================= BUILD =================
       - name: Build Tauri App
         run: pnpm tauri build
+        env:
+          TAURI_SKIP_VALIDATION: true
 
-      # ================= RELEASE =================
+      # ================= CREATE RELEASE =================
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "星野 ${{ github.ref_name }}"
+          name: "星野 ${{ steps.version.outputs.version }}"
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= MAC =================
-      - name: Upload DMG
+      # ================= UPLOAD MACOS ARTIFACTS =================
+      - name: Upload macOS artifacts
         if: matrix.platform == 'macos'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/release/bundle/dmg/*.dmg
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= WINDOWS =================
-      - name: Upload EXE
+      # ================= UPLOAD WINDOWS ARTIFACTS =================
+      - name: Upload Windows artifacts
         if: matrix.platform == 'windows'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/release/bundle/nsis/*.exe
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
