@@ -650,6 +650,13 @@ pub fn run() {
 
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // 点击关闭按钮时不退出，而是隐藏到托盘
+                window.hide().ok();
+                api.prevent_close();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             scan_workspace,
