@@ -149,6 +149,7 @@
     flex-shrink: 0;
     transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    padding-top: 38px;
   }
 
   /* 收起状态：VS Code 风格，只保留图标宽度 */
@@ -160,10 +161,16 @@
   .sidebar-header {
     display: flex;
     align-items: center;
-    padding: 8px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--sidebar-border);
     gap: 8px;
     min-height: 48px;
+  }
+
+  /* 收起时 header 只显示居中的 logo 按钮 */
+  .collapsed .sidebar-header {
+    padding: 8px 6px;
+    justify-content: center;
   }
 
   .header-logo-btn {
@@ -179,7 +186,8 @@
   }
 
   .header-logo-btn:hover .header-logo {
-    background: #5dd4ff;
+    background: var(--sidebar-accent);
+    filter: brightness(1.1);
   }
 
   .header-logo {
