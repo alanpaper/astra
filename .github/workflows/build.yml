@@ -52,6 +52,16 @@ jobs:
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
+        with:
+          cache-all-crates: true
+
+      # ================= WINDOWS DEPENDENCIES =================
+      - name: Install Windows build dependencies
+        if: matrix.platform == 'windows'
+        run: |
+          choco install wixtoolset -y
+          refreshenv
+        shell: pwsh
 
       # ================= BUILD =================
       - name: Build Tauri App
