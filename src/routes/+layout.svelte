@@ -53,70 +53,77 @@
 </script>
 
 <div class="app-layout" class:collapsed={sidebarCollapsed}>
-  <!-- 移动端遮罩 -->
-  {#if sidebarOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_roles -->
-    <div class="mobile-overlay" onclick={closeMobileMenu} role="presentation"></div>
-  {/if}
+  <!-- 顶部标题栏 -->
+  <header class="title-bar" data-tauri-drag-region>
+    <span class="title-bar-title">星野</span>
+  </header>
 
-  <!-- 汉堡按钮（移动端） -->
-  <button class="hamburger" onclick={toggleMobileMenu} aria-label="切换菜单">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      {#if sidebarOpen}
-        <line x1="18" y1="6" x2="6" y2="18"/>
-        <line x1="6" y1="6" x2="18" y2="18"/>
-      {:else}
-        <line x1="3" y1="6" x2="21" y2="6"/>
-        <line x1="3" y1="12" x2="21" y2="12"/>
-        <line x1="3" y1="18" x2="21" y2="18"/>
-      {/if}
-    </svg>
-  </button>
+  <div class="app-body">
+    <!-- 移动端遮罩 -->
+    {#if sidebarOpen}
+      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_roles -->
+      <div class="mobile-overlay" onclick={closeMobileMenu} role="presentation"></div>
+    {/if}
 
-  <!-- 侧边栏 -->
-  <aside class="sidebar" class:open={sidebarOpen}>
-    <div class="sidebar-header">
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <button class="header-logo-btn" onclick={toggleCollapse} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'} aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
-        <span class="header-logo">星</span>
-      </button>
-      <h2 class="header-title">星野</h2>
-    </div>
-    <nav class="sidebar-nav">
-      {#each menuItems as item}
+    <!-- 汉堡按钮（移动端） -->
+    <button class="hamburger" onclick={toggleMobileMenu} aria-label="切换菜单">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        {#if sidebarOpen}
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        {:else}
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        {/if}
+      </svg>
+    </button>
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar" class:open={sidebarOpen}>
+      <div class="sidebar-header">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <button class="header-logo-btn" onclick={toggleCollapse} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'} aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
+          <span class="header-logo">星</span>
+        </button>
+        <h2 class="header-title">星野</h2>
+      </div>
+      <nav class="sidebar-nav">
+        {#each menuItems as item}
+          <a
+            href={item.path}
+            class:active={$page.url.pathname === item.path}
+            onclick={closeMobileMenu}
+            title={item.label}
+          >
+            <span class="nav-icon">{item.icon}</span>
+            <span class="nav-label">{item.label}</span>
+          </a>
+        {/each}
+      </nav>
+
+      <!-- 底部设置入口 -->
+      <div class="sidebar-footer">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <a
-          href={item.path}
-          class:active={$page.url.pathname === item.path}
+          href="/settings"
+          class:active={$page.url.pathname === '/settings'}
           onclick={closeMobileMenu}
-          title={item.label}
+          title="设置"
         >
-          <span class="nav-icon">{item.icon}</span>
-          <span class="nav-label">{item.label}</span>
+          <svg class="settings-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="footer-label">设置</span>
         </a>
-      {/each}
-    </nav>
+      </div>
+    </aside>
 
-    <!-- 底部设置入口 -->
-    <div class="sidebar-footer">
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <a
-        href="/settings"
-        class:active={$page.url.pathname === '/settings'}
-        onclick={closeMobileMenu}
-        title="设置"
-      >
-        <svg class="settings-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-        <span class="footer-label">设置</span>
-      </a>
-    </div>
-  </aside>
-
-  <!-- 主内容区 -->
-  <main class="content">
-    {@render children()}
-  </main>
+    <!-- 主内容区 -->
+    <main class="content">
+      {@render children()}
+    </main>
+  </div>
 </div>
 
 <style>
@@ -128,8 +135,15 @@
 
   .app-layout {
     display: flex;
+    flex-direction: column;
     height: 100vh;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  }
+
+  .app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
   }
 
   /* 汉堡按钮（默认隐藏） */
@@ -165,6 +179,28 @@
     z-index: 999;
   }
 
+  /* ===== 顶部标题栏 ===== */
+  .title-bar {
+    height: 38px;
+    background: var(--sidebar-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    border-bottom: 1px solid var(--sidebar-border);
+  }
+
+  .title-bar-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sidebar-text);
+    letter-spacing: 0.5px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
   .sidebar {
     width: 220px;
     background: var(--sidebar-bg);
@@ -174,7 +210,6 @@
     flex-shrink: 0;
     transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
-    padding-top: 38px;
   }
 
   /* 收起状态：VS Code 风格，只保留图标宽度 */
