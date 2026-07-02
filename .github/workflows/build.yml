@@ -34,13 +34,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
-      # ================= PNPM =================
+      # ================= PNPM (CRITICAL FIX) =================
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
+          run_install: false
 
       - name: Verify pnpm
         run: |
@@ -62,10 +62,11 @@ jobs:
 
       # ================= BUILD =================
       - name: Build Tauri App
-        run: pnpm tauri build -- --target ${{ matrix.target }}
+        run: pnpm tauri build
 
-      # ================= RELEASE (CREATE ONCE) =================
+      # ================= CREATE RELEASE (ONLY ONCE) =================
       - name: Create GitHub Release
+        if: matrix.platform == 'macos'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -74,22 +75,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= MAC DMG =================
+      # ================= UPLOAD MAC =================
       - name: Upload DMG
         if: matrix.platform == 'macos'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+          files: src-tauri/target/release/bundle/dmg/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ================= WINDOWS EXE =================
+      # ================= UPLOAD WINDOWS =================
       - name: Upload EXE
         if: matrix.platform == 'windows'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+          files: src-tauri/target/release/bundle/nsis/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
