@@ -704,7 +704,7 @@
 
   .hero-search-inner:focus-within {
     border-color: var(--accent);
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08), 0 8px 32px rgba(102, 126, 234, 0.12);
+    box-shadow: 0 2px 8px var(--accent-light), 0 8px 32px var(--accent-shadow);
   }
 
   .hero-search-icon {
@@ -820,6 +820,11 @@
     border-radius: 6px;
     outline: none;
     transition: all 0.2s;
+  }
+
+  .ws-select option {
+    background: var(--bg-card);
+    color: var(--text-primary);
   }
 
   .ws-select:hover {
@@ -1045,8 +1050,8 @@
   }
 
   .sub-item:hover {
-    background: var(--border-strong);
-    border-color: #93c5fd;
+    background: var(--accent-bg-hover);
+    border-color: var(--link);
     color: var(--link-hover);
   }
 
@@ -1123,7 +1128,7 @@
   }
 
   .open-editor-btn:hover {
-    background: #eef2f6;
+    background: var(--bg-card-hover);
     color: var(--text-primary);
   }
 
@@ -1358,13 +1363,13 @@
   }
 
   .casp-badge {
-    background: #eff6ff;
-    color: #2563eb;
+    background: color-mix(in srgb, var(--link) 18%, transparent);
+    color: var(--link);
   }
 
   .ids-badge {
-    background: #f5f3ff;
-    color: #7c3aed;
+    background: color-mix(in srgb, #8b5cf6 18%, transparent);
+    color: color-mix(in srgb, #8b5cf6 80%, white);
   }
 
   .git-info {
@@ -1419,7 +1424,7 @@
   }
 
   .sub-open-btn:hover {
-    background: #eef2f6;
+    background: var(--bg-card-hover);
     color: var(--text-primary);
   }
 
@@ -1541,7 +1546,8 @@
     padding: 0;
     width: 480px;
     max-width: 90vw;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border);
     animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -1603,16 +1609,22 @@
   }
 
   .required {
-    color: #ef4444;
+    color: var(--error-text);
   }
 
   .form-group input {
     padding: 10px 14px;
+    background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: 10px;
     font-size: 14px;
+    color: var(--text-primary);
     outline: none;
     transition: all 0.2s;
+  }
+
+  .form-group input::placeholder {
+    color: var(--text-placeholder);
   }
 
   .form-group input:focus {

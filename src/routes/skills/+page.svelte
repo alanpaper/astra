@@ -178,6 +178,8 @@
 
 <style>
   .skills-page {
+    max-width: 1100px;
+    margin: 0 auto;
     animation: fadeIn 0.3s ease;
   }
 
@@ -196,12 +198,12 @@
   .page-header h1 {
     font-size: 26px;
     font-weight: 700;
-    color: #1a202c;
+    color: var(--text-primary);
     margin-bottom: 6px;
   }
 
   .subtitle {
-    color: #718096;
+    color: var(--text-muted);
     font-size: 14px;
   }
 
@@ -210,19 +212,19 @@
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    background: white;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
-    color: #475569;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .btn-refresh:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #cbd5e1;
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
   }
 
   .btn-refresh:disabled {
@@ -236,10 +238,10 @@
     align-items: center;
     gap: 8px;
     padding: 12px 16px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
     border-radius: 12px;
-    color: #dc2626;
+    color: var(--error-text);
     margin-bottom: 20px;
     font-size: 14px;
   }
@@ -248,13 +250,13 @@
     margin-left: auto;
     background: none;
     border: none;
-    color: #fca5a5;
+    color: var(--error-muted);
     cursor: pointer;
     font-size: 16px;
   }
 
   .error-dismiss:hover {
-    color: #dc2626;
+    color: var(--error-text);
   }
 
   /* 加载 */
@@ -264,14 +266,14 @@
     justify-content: center;
     gap: 12px;
     padding: 60px;
-    color: #64748b;
+    color: var(--text-secondary);
   }
 
   .spinner {
     width: 24px;
     height: 24px;
-    border: 3px solid #e2e8f0;
-    border-top-color: #667eea;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
@@ -284,9 +286,9 @@
   .empty-state {
     text-align: center;
     padding: 80px 20px;
-    background: white;
+    background: var(--bg-card);
     border-radius: 16px;
-    border: 2px dashed #e2e8f0;
+    border: 2px dashed var(--border);
   }
 
   .empty-icon {
@@ -297,26 +299,27 @@
 
   .empty-state h3 {
     font-size: 20px;
-    color: #475569;
+    color: var(--text-secondary);
     margin-bottom: 8px;
   }
 
   .empty-state p {
-    color: #94a3b8;
+    color: var(--text-muted);
     font-size: 15px;
   }
 
   .empty-state code {
-    background: #f1f5f9;
+    background: var(--bg-subtle);
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 14px;
+    color: var(--text-secondary);
   }
 
   /* 计数 */
   .skills-count {
     font-size: 14px;
-    color: #94a3b8;
+    color: var(--text-muted);
     margin-bottom: 16px;
   }
 
@@ -328,11 +331,11 @@
   }
 
   .skill-card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 14px;
     padding: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    border: 1px solid #f1f5f9;
+    box-shadow: 0 1px 3px var(--shadow-sm);
+    border: 1px solid var(--border-light);
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -340,8 +343,8 @@
   }
 
   .skill-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-    border-color: #e2e8f0;
+    box-shadow: 0 4px 12px var(--shadow-hover);
+    border-color: var(--border);
   }
 
   .skill-header {
@@ -353,26 +356,33 @@
   .skill-icon {
     font-size: 28px;
     flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-subtle);
+    border-radius: 12px;
   }
 
   .skill-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
     min-width: 0;
   }
 
   .skill-name {
     font-size: 16px;
     font-weight: 600;
-    color: #1e293b;
+    color: var(--text-primary);
     font-family: ui-monospace, monospace;
   }
 
   .skill-version {
     font-size: 11px;
-    color: #6366f1;
-    background: #eef2ff;
+    color: var(--accent);
+    background: var(--accent-bg);
     padding: 2px 8px;
     border-radius: 10px;
     font-weight: 500;
@@ -381,7 +391,7 @@
 
   .skill-desc {
     font-size: 13px;
-    color: #64748b;
+    color: var(--text-secondary);
     line-height: 1.5;
   }
 
@@ -390,7 +400,7 @@
     align-items: center;
     gap: 6px;
     font-size: 11px;
-    color: #94a3b8;
+    color: var(--text-muted);
     font-family: ui-monospace, monospace;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -411,7 +421,7 @@
     display: flex;
     justify-content: flex-end;
     padding-top: 4px;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--border-light);
   }
 
   .btn-delete {
@@ -420,19 +430,19 @@
     gap: 5px;
     padding: 6px 14px;
     background: none;
-    border: 1px solid #f1f5f9;
+    border: 1px solid var(--border-light);
     border-radius: 8px;
     font-size: 13px;
     font-weight: 500;
-    color: #94a3b8;
+    color: var(--text-muted);
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .btn-delete:hover {
-    color: #dc2626;
-    background: #fef2f2;
-    border-color: #fecaca;
+    color: var(--error-text);
+    background: var(--error-bg);
+    border-color: var(--error-border);
   }
 
   /* 弹窗 */
@@ -456,11 +466,12 @@
   }
 
   .modal {
-    background: white;
+    background: var(--bg-card);
     border-radius: 20px;
     width: 420px;
     max-width: 90vw;
-    box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+    box-shadow: 0 24px 48px rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
     animation: slideUp 0.25s ease;
   }
 
@@ -479,20 +490,22 @@
   .modal-header h2 {
     font-size: 18px;
     font-weight: 700;
-    color: #1e293b;
+    color: var(--text-primary);
   }
 
   .modal-close {
     background: none;
     border: none;
-    color: #94a3b8;
+    color: var(--text-muted);
     cursor: pointer;
     padding: 4px;
     border-radius: 6px;
+    transition: all 0.2s;
   }
 
   .modal-close:hover {
-    background: #f1f5f9;
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
   }
 
   .modal-body {
@@ -507,22 +520,23 @@
 
   .confirm-text {
     font-size: 15px;
-    color: #475569;
+    color: var(--text-secondary);
     margin-bottom: 8px;
   }
 
   .confirm-hint {
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--text-muted);
     margin-bottom: 12px;
   }
 
   .confirm-path {
     font-size: 12px;
-    color: #94a3b8;
+    color: var(--text-muted);
     font-family: ui-monospace, monospace;
     padding: 8px 12px;
-    background: #f8fafc;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-light);
     border-radius: 8px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -538,17 +552,18 @@
 
   .btn-cancel {
     padding: 10px 20px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
-    color: #475569;
+    color: var(--text-secondary);
     cursor: pointer;
+    transition: all 0.2s;
   }
 
   .btn-cancel:hover {
-    background: #f1f5f9;
+    background: var(--bg-card-hover);
   }
 
   .btn-danger {
@@ -556,7 +571,7 @@
     align-items: center;
     gap: 6px;
     padding: 10px 20px;
-    background: #dc2626;
+    background: var(--error-text);
     border: none;
     border-radius: 10px;
     font-size: 14px;

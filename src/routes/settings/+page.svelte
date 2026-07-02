@@ -636,7 +636,9 @@
   .custom-input-group input {
     width: 100%;
     padding: 10px 14px;
+    background: var(--bg-input);
     font-size: 14px;
+    color: var(--text-primary);
     border: 1px solid var(--border);
     border-radius: 10px;
     outline: none;
@@ -857,7 +859,7 @@
   }
 
   .btn-select-folder:hover {
-    background: #eef2f6;
+    background: var(--bg-card-hover);
     border-color: var(--accent);
     color: var(--accent);
   }
