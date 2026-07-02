@@ -2,6 +2,9 @@
   import { page } from '$app/stores';
   import '../styles/global.css';
   import { initTheme } from '$lib/theme.svelte';
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { invoke } from '@tauri-apps/api/core';
   let { children } = $props();
 
   initTheme();
@@ -25,6 +28,28 @@
   function toggleCollapse() {
     sidebarCollapsed = !sidebarCollapsed;
   }
+
+  // ===== 全局快捷键 =====
+  onMount(() => {
+    function handleGlobalKeydown(e: KeyboardEvent) {
+      const cmd = e.metaKey || e.ctrlKey;
+
+      // Cmd+, → 打开设置页
+      if (cmd && e.key === ',') {
+        e.preventDefault();
+        goto('/settings');
+      }
+
+      // Cmd+W → 最小化到托盘（隐藏窗口）
+      if (cmd && e.key === 'w' && !e.shiftKey) {
+        e.preventDefault();
+        invoke('minimize_to_tray');
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeydown);
+    return () => window.removeEventListener('keydown', handleGlobalKeydown);
+  });
 </script>
 
 <div class="app-layout" class:collapsed={sidebarCollapsed}>

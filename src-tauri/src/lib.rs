@@ -555,6 +555,14 @@ fn open_in_editor(path: String, editor_command: String) -> Result<(), String> {
     Ok(())
 }
 
+// ===== 命令：最小化到托盘 =====
+
+#[tauri::command]
+fn minimize_to_tray(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.hide().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // ===== 命令：获取预定义编辑器列表 =====
 
 #[tauri::command]
@@ -603,16 +611,29 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             use tauri::{
                 menu::{Menu, MenuItem},
                 tray::TrayIconBuilder,
                 Manager,
             };
+            use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-            let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+            let show_item = MenuItem::with_id(app, "show", "显示窗口", true, Some("Alt+Space"))?;
             let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出", true, Some("CmdOrCtrl+Q"))?;
             let menu = Menu::with_items(app, &[&show_item, &separator, &quit_item])?;
 
             let _tray = TrayIconBuilder::new()
@@ -648,6 +669,9 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // 注册全局快捷键 Alt+Space 唤醒窗口
+            app.global_shortcut().register("Alt+Space")?;
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -671,6 +695,7 @@ pub fn run() {
             add_workspace,
             remove_workspace,
             set_active_workspace,
+            minimize_to_tray,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
