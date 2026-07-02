@@ -13,6 +13,7 @@
     editor: EditorSetting;
     workspaces: WorkspaceConfig[];
     active_workspace: string | null;
+    scan_depth: number;
   }
 
   interface WorkspaceConfig {
@@ -36,6 +37,9 @@
 
   // 主题状态
   let currentTheme = $state<ThemeMode>(getThemeMode());
+
+  // 扫描深度状态
+  let scanDepth = $state(3);
   const themeOptions: { value: ThemeMode; label: string; icon: string }[] = [
     { value: 'light', label: '浅色', icon: '☀️' },
     { value: 'dark', label: '深色', icon: '🌙' },
@@ -58,6 +62,8 @@
       editors = presetEditors;
       workspaces = settings.workspaces;
       activeWorkspace = settings.active_workspace;
+
+      scanDepth = settings.scan_depth || 3;
 
       // 检查当前设置是否在预设中
       const match = presetEditors.find(e => e.command === settings.editor.command);
@@ -110,7 +116,8 @@
         settings: {
           editor,
           workspaces,
-          active_workspace: activeWorkspace
+          active_workspace: activeWorkspace,
+          scan_depth: scanDepth
         }
       });
 
@@ -234,6 +241,29 @@
           {/if}
         </button>
       {/each}
+    </div>
+  </div>
+
+  <!-- 扫描深度设置卡片 -->
+  <div class="settings-card scan-depth-card">
+    <div class="card-section-header">
+      <div class="section-icon">🔍</div>
+      <div class="section-text">
+        <h3>扫描深度</h3>
+        <p>点击项目卡片查看详情时，递归遍历子目录的最大层级数</p>
+      </div>
+    </div>
+
+    <div class="custom-input-group">
+      <label for="scan-depth">递归深度</label>
+      <input
+        id="scan-depth"
+        type="number"
+        min="1"
+        max="5"
+        bind:value={scanDepth}
+      />
+      <p class="input-hint">范围 1–5，数值越大遍历越深（默认 3）</p>
     </div>
   </div>
 
@@ -502,6 +532,14 @@
   /* ===== 主题选择器 ===== */
   .theme-card {
     margin-bottom: 24px;
+  }
+
+  .scan-depth-card {
+    margin-bottom: 24px;
+  }
+
+  .scan-depth-card .custom-input-group input {
+    width: 120px;
   }
 
   .theme-grid {

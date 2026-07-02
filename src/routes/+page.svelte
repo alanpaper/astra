@@ -223,10 +223,10 @@
   interface SubDetail {
     name: string;
     path: string;
-    sub_type: string;
     git_repo: GitRepo | null;
-    children: GitRepo[];
+    children: SubDetail[];
     readme_preview: string;
+    depth: number;
   }
 
   interface ProjectDetail {
@@ -342,53 +342,47 @@
             <pre class="readme-content">{selectedProject.readme_preview}</pre>
           </div>
         {/if}
+        {#snippet renderSubItem(item: SubDetail)}
+          <div class="sub-detail-card" style="margin-left: {Math.min(item.depth, 5) * 8}px">
+            <div class="sub-detail-header">
+              <span class="sub-detail-icon">📁</span>
+              <span class="sub-detail-name">{item.name}</span>
+              <button class="sub-open-btn" onclick={() => openEditorForPath(item.path)}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                打开
+              </button>
+            </div>
+            {#if item.readme_preview}
+              <div class="sub-readme">
+                <div class="sub-readme-header">📖 README</div>
+                <pre class="sub-readme-content">{item.readme_preview}</pre>
+              </div>
+            {/if}
+            {#if item.git_repo}
+              <div class="git-info">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+                <a class="git-url" href={item.git_repo.remote_url || '#'} target="_blank" rel="noreferrer">{item.git_repo.remote_url}</a>
+              </div>
+            {/if}
+            {#if item.children && item.children.length > 0}
+              {#each item.children as child}
+                {@render renderSubItem(child)}
+              {/each}
+            {/if}
+          </div>
+        {/snippet}
+
         {#if selectedProject.sub_items.length > 0}
           <div class="detail-subs">
             <div class="section-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>子项目 ({selectedProject.sub_items.length})</span></div>
             <div class="sub-detail-list">
               {#each selectedProject.sub_items as item}
-                <div class="sub-detail-card" class:casp={item.sub_type === 'casp'} class:ids={item.sub_type === 'ids'}>
-                  <div class="sub-detail-header">
-                    <span class="sub-detail-icon">{item.sub_type === 'casp' ? '📦' : '📋'}</span>
-                    <span class="sub-detail-name">{item.name}</span>
-                    <span class="sub-type-badge" class:casp-badge={item.sub_type === 'casp'} class:ids-badge={item.sub_type === 'ids'}>{item.sub_type === 'casp' ? 'CASP' : 'IDS'}</span>
-                    <button class="sub-open-btn" onclick={() => openEditorForPath(item.path)}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>打开</button>
-                  </div>
-                  {#if item.sub_type === 'casp'}
-                    {#if item.git_repo}
-                      <div class="git-info"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg><a class="git-url" href={item.git_repo.remote_url || '#'} target="_blank" rel="noreferrer">{item.git_repo.remote_url}</a></div>
-                    {:else}
-                      <div class="git-info no-remote"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>未检测到 Git 远程仓库</span></div>
-                    {/if}
-                  {/if}
-                  {#if item.sub_type === 'ids' && item.children.length > 0}
-                    <div class="ids-children">
-                      {#each item.children as child}
-                        <div class="ids-child-item">
-                          <div class="child-header"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span class="child-name">{child.name}</span><button class="sub-open-btn small" onclick={() => openEditorForPath(child.path)}><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>打开</button></div>
-                          {#if child.remote_url}
-                            <div class="git-info"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg><a class="git-url" href={child.remote_url} target="_blank" rel="noreferrer">{child.remote_url}</a></div>
-                          {:else}
-                            <div class="git-info no-remote"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>无远程仓库</span></div>
-                          {/if}
-                        </div>
-                      {/each}
-                    </div>
-                  {:else if item.sub_type === 'ids' && item.children.length === 0}
-                    <div class="git-info no-remote"><span>该 IDS 目录下没有子项目</span></div>
-                  {/if}
-                  {#if item.readme_preview}
-                    <div class="sub-readme">
-                      <div class="sub-readme-header"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>README</span></div>
-                      <pre class="sub-readme-content">{item.readme_preview}</pre>
-                    </div>
-                  {/if}
-                </div>
+                {@render renderSubItem(item)}
               {/each}
             </div>
           </div>
         {:else}
-          <div class="no-subs"><span class="no-subs-icon">📭</span><p>该项目下没有 casp 或 ids 子目录</p></div>
+          <div class="no-subs"><span class="no-subs-icon">📭</span><p>该项目下没有子目录</p></div>
         {/if}
       {/if}
     </div>
@@ -1317,14 +1311,6 @@
     transition: all 0.2s ease;
   }
 
-  .sub-detail-card.casp {
-    border-left-color: var(--link);
-  }
-
-  .sub-detail-card.ids {
-    border-left-color: #8b5cf6;
-  }
-
   .sub-detail-card:hover {
     box-shadow: 0 2px 8px var(--shadow-sm);
   }
@@ -1353,24 +1339,7 @@
     white-space: nowrap;
   }
 
-  .sub-type-badge {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 10px;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
-  }
 
-  .casp-badge {
-    background: color-mix(in srgb, var(--link) 18%, transparent);
-    color: var(--link);
-  }
-
-  .ids-badge {
-    background: color-mix(in srgb, #8b5cf6 18%, transparent);
-    color: color-mix(in srgb, #8b5cf6 80%, white);
-  }
 
   .git-info {
     display: flex;
@@ -1388,11 +1357,8 @@
   .git-info svg {
     flex-shrink: 0;
     color: var(--text-muted);
-  }
-
-  .git-info.no-remote {
-    color: var(--text-muted);
-  }
+  color: var(--text-secondary);
+}
 
   .git-url {
     color: var(--link);
@@ -1428,11 +1394,6 @@
     color: var(--text-primary);
   }
 
-  .sub-open-btn.small {
-    padding: 3px 8px;
-    font-size: 11px;
-  }
-
   /* 子项目 README */
   .sub-readme {
     margin: 8px 0;
@@ -1454,10 +1415,6 @@
     margin-bottom: 6px;
   }
 
-  .sub-readme-header svg {
-    flex-shrink: 0;
-  }
-
   .sub-readme-content {
     font-size: 12px;
     color: var(--text-secondary);
@@ -1465,40 +1422,6 @@
     white-space: pre-wrap;
     font-family: ui-monospace, monospace;
     margin: 0;
-  }
-
-  /* IDS 子目录列表 */
-  .ids-children {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .ids-child-item {
-    padding: 10px 12px;
-    background: var(--bg-subtle);
-    border-radius: 10px;
-    border: 1px solid var(--border-light);
-  }
-
-  .child-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-  }
-
-  .child-header svg {
-    flex-shrink: 0;
-    color: var(--text-muted);
-  }
-
-  .child-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    font-family: ui-monospace, monospace;
-    flex: 1;
   }
 
   .no-subs {

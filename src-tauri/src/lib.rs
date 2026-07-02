@@ -32,11 +32,17 @@ struct WorkspaceConfig {
     path: String,
 }
 
+fn default_scan_depth() -> u32 {
+    3
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct AppSettings {
     editor: EditorSetting,
     workspaces: Vec<WorkspaceConfig>,
     active_workspace: Option<String>,
+    #[serde(default = "default_scan_depth")]
+    scan_depth: u32,
 }
 
 impl Default for AppSettings {
@@ -48,6 +54,7 @@ impl Default for AppSettings {
             },
             workspaces: Vec::new(),
             active_workspace: None,
+            scan_depth: 3,
         }
     }
 }
@@ -137,7 +144,7 @@ fn scan_workspace(path: String) -> Result<Vec<ProjectCard>, String> {
     Ok(projects)
 }
 
-// ===== 扫描项目内的 casp/ids 子目录 =====
+// ===== 扫描项目子目录 =====
 
 fn scan_sub_projects(project_dir: &Path) -> Vec<SubProject> {
     let mut subs = Vec::new();
@@ -147,11 +154,7 @@ fn scan_sub_projects(project_dir: &Path) -> Vec<SubProject> {
         Err(_) => return subs,
     };
 
-    for entry in entries {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
+    for entry in entries.flatten() {
         let entry_path = entry.path();
 
         if !entry_path.is_dir() {
@@ -163,13 +166,14 @@ fn scan_sub_projects(project_dir: &Path) -> Vec<SubProject> {
             None => continue,
         };
 
-        let lower = folder_name.to_lowercase();
-        if lower.starts_with("casp") || lower.starts_with("ids") {
-            subs.push(SubProject {
-                name: folder_name,
-                path: entry_path.to_string_lossy().to_string(),
-            });
+        if folder_name.starts_with('.') || folder_name == "node_modules" {
+            continue;
         }
+
+        subs.push(SubProject {
+            name: folder_name,
+            path: entry_path.to_string_lossy().to_string(),
+        });
     }
 
     subs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -214,10 +218,10 @@ struct GitRepo {
 struct SubDetail {
     name: String,
     path: String,
-    sub_type: String,
     git_repo: Option<GitRepo>,
-    children: Vec<GitRepo>,
+    children: Vec<SubDetail>,
     readme_preview: String,
+    depth: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -240,8 +244,72 @@ fn read_readme_preview(dir: &Path) -> String {
     }
 }
 
+// ===== 递归扫描子目录（用于详情视图）=====
+
+fn scan_subdirectory(dir: &Path, current_depth: u32, max_depth: u32) -> Vec<SubDetail> {
+    if current_depth >= max_depth {
+        return Vec::new();
+    }
+
+    let mut items = Vec::new();
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return items,
+    };
+
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        if !entry_path.is_dir() {
+            continue;
+        }
+
+        let name = match entry_path.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+
+        if name.starts_with('.') || name == "node_modules" {
+            continue;
+        }
+
+        let git_repo = get_git_remote_url(&entry_path).map(|url| GitRepo {
+            name: name.clone(),
+            path: entry_path.to_string_lossy().to_string(),
+            remote_url: Some(url),
+        });
+
+        // 如果目录本身有 .git 子目录，说明这是一个 git 仓库根目录，不再遍历其子目录
+        let has_git_dir = entry_path.join(".git").exists();
+        let children = if has_git_dir {
+            Vec::new()
+        } else {
+            scan_subdirectory(&entry_path, current_depth + 1, max_depth)
+        };
+
+        // 只保留有 git 远程仓库的目录，或其子目录中有 git 远程仓库的目录
+        if git_repo.is_none() && children.is_empty() {
+            continue;
+        }
+
+        items.push(SubDetail {
+            name,
+            path: entry_path.to_string_lossy().to_string(),
+            git_repo,
+            children,
+            readme_preview: read_readme_preview(&entry_path),
+            depth: current_depth + 1,
+        });
+    }
+
+    items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    items
+}
+
 #[tauri::command]
-fn get_project_detail(path: String) -> Result<ProjectDetail, String> {
+fn get_project_detail(app: tauri::AppHandle, path: String) -> Result<ProjectDetail, String> {
+    let settings = get_settings(app);
+    let max_depth = settings.scan_depth;
+
     let dir = Path::new(&path);
     if !dir.is_dir() {
         return Err("项目目录不存在".to_string());
@@ -282,102 +350,7 @@ fn get_project_detail(path: String) -> Result<ProjectDetail, String> {
         (folder_name.clone(), String::new(), false)
     };
 
-    // 扫描子目录
-    let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {}", e))?;
-    let mut sub_items = Vec::new();
-
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("读取条目失败: {}", e))?;
-        let entry_path = entry.path();
-        if !entry_path.is_dir() {
-            continue;
-        }
-
-        let name = entry_path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-        let lower = name.to_lowercase();
-
-        if lower.starts_with("casp") {
-            let git_repo = get_git_remote_url(&entry_path).map(|url| GitRepo {
-                name: name.clone(),
-                path: entry_path.to_string_lossy().to_string(),
-                remote_url: Some(url),
-            });
-
-            // 对于 casp，如果没有 git 远程也显示一个不带远程的条目
-            if git_repo.is_none() {
-                // 也检查子目录是否有 .git
-                let has_git_dir = entry_path.join(".git").exists();
-                let repo = if has_git_dir {
-                    get_git_remote_url(&entry_path).map(|url| GitRepo {
-                        name: name.clone(),
-                        path: entry_path.to_string_lossy().to_string(),
-                        remote_url: Some(url),
-                    })
-                } else {
-                    None
-                };
-                sub_items.push(SubDetail {
-                    name: name.clone(),
-                    path: entry_path.to_string_lossy().to_string(),
-                    sub_type: "casp".to_string(),
-                    git_repo: repo,
-                    children: Vec::new(),
-                    readme_preview: read_readme_preview(&entry_path),
-                });
-            } else {
-                sub_items.push(SubDetail {
-                    name: name.clone(),
-                    path: entry_path.to_string_lossy().to_string(),
-                    sub_type: "casp".to_string(),
-                    git_repo,
-                    children: Vec::new(),
-                    readme_preview: read_readme_preview(&entry_path),
-                });
-            }
-        } else if lower.starts_with("ids") {
-            // 扫描 ids 的子目录
-            let mut children = Vec::new();
-            if let Ok(child_entries) = fs::read_dir(&entry_path) {
-                for child in child_entries.flatten() {
-                    let child_path = child.path();
-                    if !child_path.is_dir() {
-                        continue;
-                    }
-                    let child_name = child_path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    if child_name.starts_with('.') {
-                        continue;
-                    }
-
-                    let remote_url = get_git_remote_url(&child_path);
-                    if let Some(url) = remote_url {
-                        children.push(GitRepo {
-                            name: child_name,
-                            path: child_path.to_string_lossy().to_string(),
-                            remote_url: Some(url),
-                        });
-                    }
-                }
-            }
-            sub_items.push(SubDetail {
-                name: name.clone(),
-                path: entry_path.to_string_lossy().to_string(),
-                sub_type: "ids".to_string(),
-                git_repo: None,
-                children,
-                readme_preview: read_readme_preview(&entry_path),
-            });
-        }
-    }
-
-    sub_items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    let sub_items = scan_subdirectory(&dir, 0, max_depth);
 
     Ok(ProjectDetail {
         name: project_name,
