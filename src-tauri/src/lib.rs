@@ -1,10 +1,57 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
 use tauri::Manager;
 
-// ===== 类型定义 =====
+// ===== llama-server 管理 =====
+
+struct RunningServer {
+    child: Child,
+    port: u16,
+    model_name: String,
+    model_path: String,
+    started_at: u64,
+}
+
+type ServerState = Mutex<Vec<RunningServer>>;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct ModelConfig {
+    id: String,
+    name: String,
+    model_path: String,
+    server_path: String,
+    port: u16,
+    ngl: u32,
+}
+
+#[derive(Debug, Serialize)]
+struct RunningModelInfo {
+    #[serde(flatten)]
+    config: ModelConfig,
+    status: String,
+    pid: Option<u32>,
+    started_at: u64,
+}
+
+fn unix_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn default_port() -> u16 {
+    8080
+}
+
+fn default_ngl() -> u32 {
+    999
+}
+
+// ===== 类型定义（保持原有）=====
 
 #[derive(Debug, Serialize, Clone)]
 struct SubProject {
@@ -43,6 +90,8 @@ struct AppSettings {
     active_workspace: Option<String>,
     #[serde(default = "default_scan_depth")]
     scan_depth: u32,
+    #[serde(default)]
+    models: Vec<ModelConfig>,
 }
 
 impl Default for AppSettings {
@@ -55,6 +104,7 @@ impl Default for AppSettings {
             workspaces: Vec::new(),
             active_workspace: None,
             scan_depth: 3,
+            models: Vec::new(),
         }
     }
 }
@@ -536,6 +586,185 @@ fn minimize_to_tray(window: tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+// ===== 命令： llama-server 管理 =====
+
+#[tauri::command]
+fn start_llama_server(
+    app: tauri::AppHandle,
+    server_path: String,
+    model_path: String,
+    port: Option<u16>,
+    ngl: Option<u32>,
+    model_name: String,
+) -> Result<(u16, u32), String> {
+    let actual_port = port.unwrap_or(default_port());
+    let actual_ngl = ngl.unwrap_or(default_ngl());
+
+    // 检查端口是否已被占用
+    let state = app.state::<ServerState>();
+    let servers = state.lock().unwrap();
+    for server in servers.iter() {
+        if server.port == actual_port {
+            return Err(format!("端口 {} 已被占用", actual_port));
+        }
+    }
+    // 释放锁，以便后续可以再次获取
+    drop(servers);
+
+    // 构建命令
+    let mut cmd = Command::new(&server_path);
+    cmd.arg("-m")
+        .arg(&model_path)
+        .arg("--port")
+        .arg(actual_port.to_string())
+        .arg("-ngl")
+        .arg(actual_ngl.to_string())
+        .arg("--host")
+        .arg("0.0.0.0")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let child = cmd
+        .spawn()
+        .map_err(|e| format!("启动 llama-server 失败: {}", e))?;
+
+    // 记录运行中的服务
+    let server = RunningServer {
+        child,
+        port: actual_port,
+        model_name,
+        model_path,
+        started_at: unix_timestamp(),
+    };
+    app.state::<ServerState>().lock().unwrap().push(server);
+
+    Ok((actual_port, actual_ngl))
+}
+
+#[tauri::command]
+fn stop_llama_server(app: tauri::AppHandle, port: u16) -> Result<bool, String> {
+    let state = app.state::<ServerState>();
+    let mut servers = state.lock().unwrap();
+    let mut server_index = None;
+
+    for (i, server) in servers.iter().enumerate() {
+        if server.port == port {
+            server_index = Some(i);
+            break;
+        }
+    }
+
+    if let Some(index) = server_index {
+        let mut server = servers.remove(index);
+        // 尝试优雅关闭
+        match server.child.try_wait() {
+            Ok(Some(_)) => {
+                // 进程已经终止
+                Ok(true)
+            }
+            Ok(None) => {
+                // 进程仍在运行，强制终止
+                server
+                    .child
+                    .kill()
+                    .map_err(|e| format!("终止进程失败: {}", e))?;
+                Ok(true)
+            }
+            Err(_) => Ok(false),
+        }
+    } else {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+fn list_running_servers(app: tauri::AppHandle) -> Result<Vec<RunningModelInfo>, String> {
+    let mut servers = Vec::new();
+    let state = app.state::<ServerState>();
+    let mut running_servers = state.lock().unwrap();
+    let mut dead_servers = Vec::new();
+
+    for (i, server) in running_servers.iter_mut().enumerate() {
+        // 检查进程状态
+        let status = match server.child.try_wait() {
+            Ok(Some(_)) => "stopped",
+            Ok(None) => "running",
+            Err(_) => "unknown",
+        };
+
+        servers.push(RunningModelInfo {
+            config: ModelConfig {
+                id: format!("model-{}-{}", server.model_name, server.port),
+                name: server.model_name.clone(),
+                model_path: server.model_path.clone(),
+                server_path: String::new(),
+                port: server.port,
+                ngl: 0,
+            },
+            status: status.to_string(),
+            pid: Some(server.child.id() as u32),
+            started_at: server.started_at,
+        });
+
+        if status != "running" {
+            dead_servers.push(i);
+        }
+    }
+
+    // 清理已终止的服务
+    for index in dead_servers.into_iter().rev() {
+        let _ = running_servers.remove(index);
+    }
+
+    Ok(servers)
+}
+
+#[tauri::command]
+fn check_server_status(app: tauri::AppHandle, port: u16) -> Result<Option<String>, String> {
+    let state = app.state::<ServerState>();
+    let mut servers = state.lock().unwrap();
+
+    for server in servers.iter_mut() {
+        if server.port == port {
+            return Ok(Some(
+                match server.child.try_wait() {
+                    Ok(Some(_)) => "stopped",
+                    Ok(None) => "running",
+                    Err(_) => "unknown",
+                }
+                .to_string(),
+            ));
+        }
+    }
+
+    Ok(None)
+}
+
+#[tauri::command]
+fn list_model_configs(app: tauri::AppHandle) -> Vec<ModelConfig> {
+    let settings = get_settings(app);
+    settings.models
+}
+
+#[tauri::command]
+fn save_model_config(app: tauri::AppHandle, model: ModelConfig) -> Result<(), String> {
+    let mut settings = get_settings(app.clone());
+    // 检查 ID 是否冲突（排除自己）
+    if let Some(pos) = settings.models.iter().position(|m| m.id == model.id) {
+        settings.models[pos] = model;
+    } else {
+        settings.models.push(model);
+    }
+    save_settings(app, settings)
+}
+
+#[tauri::command]
+fn delete_model_config(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let mut settings = get_settings(app.clone());
+    settings.models.retain(|m| m.id != id);
+    save_settings(app, settings)
+}
+
 // ===== 命令：窗口拖拽 =====
 
 #[tauri::command]
@@ -549,7 +778,24 @@ fn drag_window(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-// ===== 命令：获取预定义编辑器列表 =====
+// ===== 命令：设置窗口背景色（主题切换时调用）=====
+
+#[tauri::command]
+fn set_window_background(app: tauri::AppHandle, is_dark: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "主窗口未找到".to_string())?;
+    use tauri::window::Color;
+    let color = if is_dark {
+        Color(20, 20, 32, 255)
+    } else {
+        Color(240, 242, 245, 255)
+    };
+    window
+        .set_background_color(Some(color))
+        .map_err(|e| format!("设置背景色失败: {}", e))?;
+    Ok(())
+}
 
 #[tauri::command]
 fn get_preset_editors() -> Vec<EditorSetting> {
@@ -594,6 +840,7 @@ fn get_preset_editors() -> Vec<EditorSetting> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(Mutex::new(Vec::<RunningServer>::new()))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -683,6 +930,14 @@ pub fn run() {
             set_active_workspace,
             minimize_to_tray,
             drag_window,
+            set_window_background,
+            start_llama_server,
+            stop_llama_server,
+            list_running_servers,
+            check_server_status,
+            list_model_configs,
+            save_model_config,
+            delete_model_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
