@@ -350,7 +350,12 @@ fn get_project_detail(app: tauri::AppHandle, path: String) -> Result<ProjectDeta
         (folder_name.clone(), String::new(), false)
     };
 
-    let sub_items = scan_subdirectory(&dir, 0, max_depth);
+    // 如果项目根目录本身就有 .git，说明整个项目就是一个 git 仓库，不遍历子目录
+    let sub_items = if dir.join(".git").exists() {
+        Vec::new()
+    } else {
+        scan_subdirectory(&dir, 0, max_depth)
+    };
 
     Ok(ProjectDetail {
         name: project_name,
