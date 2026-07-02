@@ -286,11 +286,6 @@ fn scan_subdirectory(dir: &Path, current_depth: u32, max_depth: u32) -> Vec<SubD
             scan_subdirectory(&entry_path, current_depth + 1, max_depth)
         };
 
-        // 只保留有 git 远程仓库的目录，或其子目录中有 git 远程仓库的目录
-        if git_repo.is_none() && children.is_empty() {
-            continue;
-        }
-
         items.push(SubDetail {
             name,
             path: entry_path.to_string_lossy().to_string(),
