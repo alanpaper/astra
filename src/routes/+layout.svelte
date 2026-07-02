@@ -1,7 +1,10 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import '../styles/global.css';
+  import { initTheme } from '$lib/theme.svelte';
   let { children } = $props();
+
+  initTheme();
 
   const menuItems = [
     { id: 'workspace', label: '工作空间', path: '/', icon: '📁' },
@@ -111,18 +114,18 @@
     top: 12px;
     left: 12px;
     z-index: 1001;
-    background: #1a1a2e;
-    color: white;
+    background: var(--sidebar-bg);
+    color: var(--text-primary);
     border: none;
     border-radius: 10px;
     padding: 10px;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 8px var(--shadow-md);
     transition: all 0.2s;
   }
 
   .hamburger:hover {
-    background: #2d2d4e;
+    background: var(--bg-card-hover);
   }
 
   /* 移动端遮罩 */
@@ -139,8 +142,8 @@
 
   .sidebar {
     width: 220px;
-    background: #1a1a2e;
-    color: white;
+    background: var(--sidebar-bg);
+    color: var(--text-primary);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
@@ -158,7 +161,7 @@
     display: flex;
     align-items: center;
     padding: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--sidebar-border);
     gap: 8px;
     min-height: 48px;
   }
@@ -186,8 +189,8 @@
     width: 32px;
     height: 32px;
     flex-shrink: 0;
-    background: #4fc3f7;
-    color: #1a1a2e;
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-active-text);
     font-weight: 700;
     font-size: 15px;
     border-radius: 8px;
@@ -198,7 +201,7 @@
     flex: 1;
     font-size: 18px;
     font-weight: 700;
-    color: #4fc3f7;
+    color: var(--sidebar-accent);
     letter-spacing: 1px;
     white-space: nowrap;
     overflow: hidden;
@@ -223,7 +226,7 @@
     align-items: center;
     gap: 12px;
     padding: 10px 12px;
-    color: #a0aec0;
+    color: var(--sidebar-text);
     text-decoration: none;
     font-size: 14px;
     border-radius: 8px;
@@ -233,13 +236,13 @@
   }
 
   .sidebar-nav a:hover {
-    background: rgba(79, 195, 247, 0.1);
-    color: #e2e8f0;
+    background: var(--sidebar-hover-bg);
+    color: var(--sidebar-text-hover);
   }
 
   .sidebar-nav a.active {
-    background: #4fc3f7;
-    color: #1a1a2e;
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-active-text);
     font-weight: 600;
   }
 
@@ -269,7 +272,7 @@
   /* ===== 底部 ===== */
   .sidebar-footer {
     padding: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--sidebar-border);
   }
 
   .sidebar-footer a {
@@ -277,7 +280,7 @@
     align-items: center;
     gap: 12px;
     padding: 10px 12px;
-    color: #a0aec0;
+    color: var(--sidebar-text);
     text-decoration: none;
     font-size: 14px;
     border-radius: 8px;
@@ -287,13 +290,13 @@
   }
 
   .sidebar-footer a:hover {
-    background: rgba(79, 195, 247, 0.1);
-    color: #e2e8f0;
+    background: var(--sidebar-hover-bg);
+    color: var(--sidebar-text-hover);
   }
 
   .sidebar-footer a.active {
-    background: #4fc3f7;
-    color: #1a1a2e;
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-active-text);
     font-weight: 600;
   }
 
@@ -319,7 +322,7 @@
   .content {
     flex: 1;
     overflow-y: auto;
-    background: #f0f2f5;
+    background: var(--bg-app);
     padding: 32px;
     transition: padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }

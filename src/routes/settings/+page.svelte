@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
+  import { getThemeMode, setThemeMode, type ThemeMode } from '$lib/theme.svelte';
 
   // ===== 类型 =====
   interface EditorSetting {
@@ -32,6 +33,19 @@
   // 工作空间状态
   let workspaces = $state<WorkspaceConfig[]>([]);
   let activeWorkspace = $state<string | null>(null);
+
+  // 主题状态
+  let currentTheme = $state<ThemeMode>(getThemeMode());
+  const themeOptions: { value: ThemeMode; label: string; icon: string }[] = [
+    { value: 'light', label: '浅色', icon: '☀️' },
+    { value: 'dark', label: '深色', icon: '🌙' },
+    { value: 'system', label: '跟随系统', icon: '🖥️' },
+  ];
+
+  function changeTheme(theme: ThemeMode) {
+    currentTheme = theme;
+    setThemeMode(theme);
+  }
 
   // ===== 加载设置 =====
   onMount(async () => {
@@ -193,6 +207,33 @@
     <div class="header-left">
       <h1>设置</h1>
       <p class="subtitle">配置你的开发工具偏好</p>
+    </div>
+  </div>
+
+  <!-- 主题设置卡片 -->
+  <div class="settings-card theme-card">
+    <div class="card-section-header">
+      <div class="section-icon">🎨</div>
+      <div class="section-text">
+        <h3>外观主题</h3>
+        <p>选择浅色、深色或跟随系统主题</p>
+      </div>
+    </div>
+
+    <div class="theme-grid">
+      {#each themeOptions as opt}
+        <button
+          class="theme-option"
+          class:selected={currentTheme === opt.value}
+          onclick={() => changeTheme(opt.value)}
+        >
+          <span class="theme-icon">{opt.icon}</span>
+          <span class="theme-name">{opt.label}</span>
+          {#if currentTheme === opt.value}
+            <span class="check-mark">✓</span>
+          {/if}
+        </button>
+      {/each}
     </div>
   </div>
 
@@ -390,22 +431,22 @@
   .page-header h1 {
     font-size: 26px;
     font-weight: 700;
-    color: #1a202c;
+    color: var(--text-primary);
     margin-bottom: 6px;
   }
 
   .subtitle {
-    color: #718096;
+    color: var(--text-muted);
     font-size: 14px;
   }
 
   /* ===== 设置卡片 ===== */
   .settings-card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 16px;
     padding: 28px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    border: 1px solid #f1f5f9;
+    box-shadow: 0 1px 3px var(--shadow-sm);
+    border: 1px solid var(--border-light);
   }
 
   .card-section-header {
@@ -414,7 +455,7 @@
     gap: 14px;
     margin-bottom: 24px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--border-light);
   }
 
   .section-icon {
@@ -425,13 +466,13 @@
   .section-text h3 {
     font-size: 18px;
     font-weight: 600;
-    color: #1e293b;
+    color: var(--text-primary);
     margin-bottom: 4px;
   }
 
   .section-text p {
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--text-muted);
     line-height: 1.5;
   }
 
@@ -442,20 +483,65 @@
     gap: 8px;
     margin-bottom: 16px;
     padding: 10px 14px;
-    background: #f8fafc;
+    background: var(--bg-subtle);
     border-radius: 10px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border);
   }
 
   .selection-label {
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--text-muted);
   }
 
   .selection-value {
     font-size: 14px;
     font-weight: 600;
-    color: #6366f1;
+    color: var(--accent);
+  }
+
+  /* ===== 主题选择器 ===== */
+  .theme-card {
+    margin-bottom: 24px;
+  }
+
+  .theme-grid {
+    display: flex;
+    gap: 10px;
+  }
+
+  .theme-option {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 12px;
+    background: var(--bg-subtle);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .theme-option:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-card-hover);
+  }
+
+  .theme-option.selected {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+
+  .theme-icon {
+    font-size: 28px;
+  }
+
+  .theme-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
   }
 
   /* ===== 编辑器网格 ===== */
@@ -472,8 +558,8 @@
     align-items: center;
     gap: 6px;
     padding: 16px 12px;
-    background: #f8fafc;
-    border: 2px solid #e2e8f0;
+    background: var(--bg-subtle);
+    border: 2px solid var(--border);
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -481,13 +567,13 @@
   }
 
   .editor-option:hover {
-    border-color: #cbd5e1;
-    background: #f1f5f9;
+    border-color: var(--border-strong);
+    background: var(--border-light);
   }
 
   .editor-option.selected {
-    border-color: #6366f1;
-    background: #eef2ff;
+    border-color: var(--accent);
+    background: var(--accent-bg);
   }
 
   .editor-icon {
@@ -505,12 +591,12 @@
   .editor-name {
     font-size: 13px;
     font-weight: 600;
-    color: #1e293b;
+    color: var(--text-primary);
   }
 
   .editor-command {
     font-size: 11px;
-    color: #94a3b8;
+    color: var(--text-muted);
     font-family: ui-monospace, monospace;
   }
 
@@ -520,8 +606,8 @@
     right: 6px;
     width: 20px;
     height: 20px;
-    background: #6366f1;
-    color: white;
+    background: var(--accent);
+    color: var(--bg-card);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -543,7 +629,7 @@
     display: block;
     font-size: 13px;
     font-weight: 600;
-    color: #475569;
+    color: var(--text-secondary);
     margin-bottom: 8px;
   }
 
@@ -551,7 +637,7 @@
     width: 100%;
     padding: 10px 14px;
     font-size: 14px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border);
     border-radius: 10px;
     outline: none;
     transition: all 0.2s;
@@ -559,17 +645,17 @@
   }
 
   .custom-input-group input:focus {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
   }
 
   .custom-input-group input::placeholder {
-    color: #cbd5e1;
+    color: var(--text-placeholder);
   }
 
   .input-hint {
     font-size: 12px;
-    color: #94a3b8;
+    color: var(--text-muted);
     margin-top: 6px;
   }
 
@@ -586,19 +672,19 @@
     align-items: center;
     gap: 6px;
     padding: 10px 18px;
-    background: white;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
-    color: #475569;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .btn-test:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #cbd5e1;
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
   }
 
   .btn-test:disabled {
@@ -614,13 +700,13 @@
   }
 
   .test-success {
-    background: #f0fdf4;
-    color: #16a34a;
+    background: var(--success-bg);
+    color: var(--success-text);
   }
 
   .test-error {
-    background: #fef2f2;
-    color: #dc2626;
+    background: var(--error-bg);
+    color: var(--error-text);
   }
 
   @keyframes slideDown {
@@ -636,9 +722,9 @@
   .ws-empty {
     padding: 24px;
     text-align: center;
-    color: #94a3b8;
+    color: var(--text-muted);
     font-size: 14px;
-    background: #f8fafc;
+    background: var(--bg-subtle);
     border-radius: 10px;
     margin-bottom: 16px;
   }
@@ -656,15 +742,15 @@
     justify-content: space-between;
     gap: 12px;
     padding: 12px 14px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
     border-radius: 10px;
     transition: all 0.2s;
   }
 
   .ws-item.active {
-    border-color: #667eea;
-    background: #eef2ff;
+    border-color: var(--accent);
+    background: var(--accent-bg);
   }
 
   .ws-item-left {
@@ -677,7 +763,7 @@
 
   .ws-item-left svg {
     flex-shrink: 0;
-    color: #94a3b8;
+    color: var(--text-muted);
   }
 
   .ws-item-info {
@@ -690,12 +776,12 @@
   .ws-item-name {
     font-size: 14px;
     font-weight: 600;
-    color: #1e293b;
+    color: var(--text-primary);
   }
 
   .ws-item-path {
     font-size: 11px;
-    color: #94a3b8;
+    color: var(--text-muted);
     font-family: ui-monospace, monospace;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -711,25 +797,25 @@
 
   .ws-btn-activate {
     padding: 4px 10px;
-    background: #eef2ff;
+    background: var(--accent-bg);
     border: 1px solid #c7d2fe;
     border-radius: 6px;
     font-size: 12px;
     font-weight: 500;
-    color: #6366f1;
+    color: var(--accent);
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .ws-btn-activate:hover {
-    background: #e0e7ff;
+    background: var(--accent-bg-hover);
   }
 
   .ws-badge-active {
     font-size: 11px;
     font-weight: 600;
-    color: #16a34a;
-    background: #f0fdf4;
+    color: var(--success-text);
+    background: var(--success-bg);
     padding: 3px 8px;
     border-radius: 6px;
   }
@@ -742,15 +828,15 @@
     height: 28px;
     background: none;
     border: none;
-    color: #94a3b8;
+    color: var(--text-muted);
     cursor: pointer;
     border-radius: 6px;
     transition: all 0.2s;
   }
 
   .ws-btn-remove:hover {
-    color: #dc2626;
-    background: #fef2f2;
+    color: var(--error-text);
+    background: var(--error-bg);
   }
 
   .btn-select-folder {
@@ -758,12 +844,12 @@
     align-items: center;
     gap: 8px;
     padding: 12px 20px;
-    background: #f8fafc;
-    border: 1px dashed #e2e8f0;
+    background: var(--bg-subtle);
+    border: 1px dashed var(--border);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
-    color: #475569;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s;
     width: 100%;
@@ -772,8 +858,8 @@
 
   .btn-select-folder:hover {
     background: #eef2f6;
-    border-color: #667eea;
-    color: #6366f1;
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   /* ===== 全局保存栏 ===== */
@@ -784,10 +870,10 @@
     gap: 16px;
     margin-top: 28px;
     padding: 16px 24px;
-    background: white;
+    background: var(--bg-card);
     border-radius: 14px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
-    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px var(--shadow-sm), 0 4px 12px var(--shadow-md);
+    border: 1px solid var(--border);
     position: sticky;
     bottom: 0;
   }
@@ -797,13 +883,13 @@
     align-items: center;
     gap: 10px;
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--text-muted);
   }
 
   .save-dot {
     width: 8px;
     height: 8px;
-    background: #667eea;
+    background: var(--accent);
     border-radius: 50%;
     animation: pulse 2s ease-in-out infinite;
   }
@@ -818,21 +904,21 @@
     align-items: center;
     gap: 8px;
     padding: 12px 28px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: var(--accent-gradient);
     border: none;
     border-radius: 12px;
     font-size: 15px;
     font-weight: 600;
-    color: white;
+    color: var(--bg-card);
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px var(--accent-shadow);
   }
 
   .btn-save:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 6px 16px var(--accent-shadow-hover);
   }
 
   .btn-save:active:not(:disabled) {
