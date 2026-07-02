@@ -55,7 +55,7 @@ jobs:
 
       # ================= BUILD =================
       - name: Build Tauri App
-        run: pnpm tauri build -- --target ${{ matrix.target }}
+        run: pnpm tauri build
 
       # ================= RELEASE =================
       - name: Create Release
@@ -73,7 +73,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+          files: src-tauri/target/release/bundle/dmg/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -83,6 +83,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+          files: src-tauri/target/release/bundle/nsis/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
