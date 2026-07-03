@@ -142,13 +142,14 @@
 
     formSaving = true;
     try {
+      const modelId = `model-${newName.trim().toLowerCase().replace(/\s+/g, '-').trim()}-${newPort}`;
       const newConfig: ModelConfig = {
-        id: '',
+        id: modelId,
         name: newName.trim(),
         model_path: newModelPath.trim(),
         server_path: newServerPath.trim(),
         port: newPort,
-        ngl: newNgl
+        ngl: newNgl,
       };
       await invoke('save_model_config', { model: newConfig });
       showAddModal = false;
@@ -293,8 +294,8 @@
         </div>
         <div class="form-group">
           <!-- svelte-ignore a11y_label_has_associated_control -->
-          <label>llama-server 路径</label>
-          <input type="text" bind:value={newServerPath} placeholder="/path/to/llama-server" />
+          <label>llama 路径</label>
+          <input type="text" bind:value={newServerPath} placeholder="如 /Users/hanbiao/.llama-app/llama" />
         </div>
         <div class="form-group">
           <!-- svelte-ignore a11y_label_has_associated_control -->

@@ -13,6 +13,7 @@ struct RunningServer {
     model_name: String,
     model_path: String,
     started_at: u64,
+    pid: u32,
 }
 
 type ServerState = Mutex<Vec<RunningServer>>;
@@ -600,7 +601,11 @@ fn start_llama_server(
     let actual_port = port.unwrap_or(default_port());
     let actual_ngl = ngl.unwrap_or(default_ngl());
 
-    // 检查端口是否已被占用
+    // 检查端口是否已被占用（操作系统层面检测）
+    std::net::TcpListener::bind(format!("0.0.0.0:{}", actual_port))
+        .map_err(|e| format!("端口 {} 已被占用：{}", actual_port, e))?;
+
+    // 检查内部状态中是否有相同端口的进程（双重检查）
     let state = app.state::<ServerState>();
     let servers = state.lock().unwrap();
     for server in servers.iter() {
@@ -611,9 +616,28 @@ fn start_llama_server(
     // 释放锁，以便后续可以再次获取
     drop(servers);
 
-    // 构建命令
+    // 构建命令：llama serve -m <model> --port <port> -ngl <ngl> --host 0.0.0.0
+    // 打包后 PATH 可能不完整，补充常见安装路径
+    let existing_path = std::env::var("PATH").unwrap_or_default();
+    let extra_paths = [
+        "/usr/local/bin",
+        "/opt/homebrew/bin",
+        "/opt/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/Users/hanbiao/.llama-app",
+    ];
+    let full_path = if existing_path.is_empty() {
+        extra_paths.join(":")
+    } else {
+        let mut parts: Vec<&str> = extra_paths.iter().map(|s| *s).collect();
+        parts.push(&existing_path);
+        parts.join(":")
+    };
+
     let mut cmd = Command::new(&server_path);
-    cmd.arg("-m")
+    cmd.arg("serve")
+        .arg("-m")
         .arg(&model_path)
         .arg("--port")
         .arg(actual_port.to_string())
@@ -621,20 +645,23 @@ fn start_llama_server(
         .arg(actual_ngl.to_string())
         .arg("--host")
         .arg("0.0.0.0")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .env("PATH", &full_path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
 
     let child = cmd
         .spawn()
-        .map_err(|e| format!("启动 llama-server 失败: {}", e))?;
+        .map_err(|e| format!("启动 llama serve 失败：{}", e))?;
 
     // 记录运行中的服务
+    let pid = child.id();
     let server = RunningServer {
         child,
         port: actual_port,
         model_name,
         model_path,
         started_at: unix_timestamp(),
+        pid,
     };
     app.state::<ServerState>().lock().unwrap().push(server);
 
@@ -702,7 +729,7 @@ fn list_running_servers(app: tauri::AppHandle) -> Result<Vec<RunningModelInfo>, 
                 ngl: 0,
             },
             status: status.to_string(),
-            pid: Some(server.child.id() as u32),
+            pid: Some(server.pid),
             started_at: server.started_at,
         });
 
@@ -730,7 +757,16 @@ fn check_server_status(app: tauri::AppHandle, port: u16) -> Result<Option<String
                 match server.child.try_wait() {
                     Ok(Some(_)) => "stopped",
                     Ok(None) => "running",
-                    Err(_) => "unknown",
+                    Err(_) => {
+                        // 进程可能已崩溃，尝试通过 TCP 探测确认
+                        if std::net::TcpListener::bind(format!("0.0.0.0:{}", port)).is_ok() {
+                            // 可以绑定 = 端口没有进程在监听
+                            "stopped"
+                        } else {
+                            // 仍然被占用 = 有外部进程
+                            "running"
+                        }
+                    }
                 }
                 .to_string(),
             ));
@@ -749,8 +785,9 @@ fn list_model_configs(app: tauri::AppHandle) -> Vec<ModelConfig> {
 #[tauri::command]
 fn save_model_config(app: tauri::AppHandle, model: ModelConfig) -> Result<(), String> {
     let mut settings = get_settings(app.clone());
+    let model_id = model.id.clone();
     // 检查 ID 是否冲突（排除自己）
-    if let Some(pos) = settings.models.iter().position(|m| m.id == model.id) {
+    if let Some(pos) = settings.models.iter().position(|m| m.id == model_id) {
         settings.models[pos] = model;
     } else {
         settings.models.push(model);

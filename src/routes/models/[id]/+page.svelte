@@ -31,7 +31,7 @@
 
   const startCommand = $derived(
     model
-      ? `./llama-server -m ${model.model_path.split('/').pop()} --port ${model.port} -ngl ${model.ngl} --host 0.0.0.0`
+      ? `${model.server_path} serve -m ${model.model_path} --host 0.0.0.0 --port ${model.port}${model.ngl > 0 ? ` -ngl ${model.ngl}` : ''}`
       : ''
   );
 
