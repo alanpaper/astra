@@ -617,6 +617,13 @@ fn start_llama_server(
     drop(servers);
 
     // 构建命令：llama serve -m <model> --port <port> -ngl <ngl> --host 0.0.0.0
+    // 空则默认使用 'llama'（依赖系统 PATH）
+    let server_bin = if server_path.trim().is_empty() {
+        "llama"
+    } else {
+        &server_path
+    };
+
     // 打包后 PATH 可能不完整，补充常见安装路径
     let existing_path = std::env::var("PATH").unwrap_or_default();
     let extra_paths = [
@@ -635,7 +642,7 @@ fn start_llama_server(
         parts.join(":")
     };
 
-    let mut cmd = Command::new(&server_path);
+    let mut cmd = Command::new(server_bin);
     cmd.arg("serve")
         .arg("-m")
         .arg(&model_path)

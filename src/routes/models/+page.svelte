@@ -135,7 +135,6 @@
   async function saveNewModel() {
     formError = '';
     if (!newName.trim()) { formError = '请输入模型名称'; return; }
-    if (!newServerPath.trim()) { formError = '请输入 llama-server 路径'; return; }
     if (!newModelPath.trim()) { formError = '请输入模型文件路径'; return; }
     if (!newPort || newPort < 1 || newPort > 65535) { formError = '端口号范围 1-65535'; return; }
     if (newNgl < 0 || !Number.isInteger(newNgl)) { formError = 'ngl 必须为非负整数'; return; }
@@ -147,7 +146,7 @@
         id: modelId,
         name: newName.trim(),
         model_path: newModelPath.trim(),
-        server_path: newServerPath.trim(),
+        server_path: newServerPath.trim() || 'llama',  // 空则默认使用 'llama'
         port: newPort,
         ngl: newNgl,
       };
@@ -294,8 +293,9 @@
         </div>
         <div class="form-group">
           <!-- svelte-ignore a11y_label_has_associated_control -->
-          <label>llama 路径</label>
-          <input type="text" bind:value={newServerPath} placeholder="如 /Users/hanbiao/.llama-app/llama" />
+          <label>llama 路径 <span class="optional-tag">(可选)</span></label>
+          <input type="text" bind:value={newServerPath} placeholder="留空使用系统 PATH 中的 llama" />
+          <p class="input-hint">若已配置环境变量，可留空直接使用 <code>llama</code> 命令</p>
         </div>
         <div class="form-group">
           <!-- svelte-ignore a11y_label_has_associated_control -->
@@ -891,6 +891,27 @@
 
   .form-row .form-group {
     flex: 1;
+  }
+
+  .optional-tag {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .input-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .input-hint code {
+    background: var(--bg-subtle);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--accent);
   }
 
   .form-error {
