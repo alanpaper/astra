@@ -86,6 +86,9 @@ astra/
 │   │   ├── chat_sessions.rs      # 对话会话持久化
 │   │   ├── command_runner.rs     # Shell 命令执行
 │   │   ├── downloader.rs         # 文件下载（断点续传）
+│   │   ├── embedding.rs          # 文本嵌入（本地 llama.cpp / provider API）
+│   │   ├── indexer.rs            # 项目索引（扫描 → 分块 → 嵌入 → 存储）
+│   │   ├── vector_store.rs       # 项目代码向量索引（SQLite + 余弦相似度）
 │   │   └── providers.rs          # API Provider CRUD
 │   ├── capabilities/             # Tauri 权限配置
 │   ├── tauri.conf.json
@@ -334,6 +337,14 @@ class LogsStore {
 // Skills
 #[tauri::command] fn scan_skills() -> Vec<Skill>
 #[tauri::command] fn delete_skill(name: String) -> Result<()>
+
+// 嵌入 & 向量检索
+#[tauri::command] async fn embed_text(source: EmbeddingSource, texts: Vec<String>) -> Result<EmbedResult>
+#[tauri::command] async fn test_embedding_source(source: EmbeddingSource) -> Result<bool>
+#[tauri::command] fn store_chunks(project_path, file_path, chunks, model_name) -> Result<usize>
+#[tauri::command] fn delete_project_index(project_path) -> Result<usize>
+#[tauri::command] fn search_similar(project_path, query_embedding, top_k) -> Result<Vec<SearchResult>>
+#[tauri::command] fn get_index_stats() -> Result<IndexStats>
 ```
 
 ### `src-tauri/src/chat.rs` — AI 对话
@@ -347,6 +358,27 @@ class LogsStore {
 ### `src-tauri/src/chat_sessions.rs` — 会话存储
 
 SQLite 持久化对话历史，JSON 存消息列表。
+
+### `src-tauri/src/embedding.rs` — 文本嵌入
+
+将文本转换为向量，用于项目代码语义检索（RAG）。
+
+- `embed_text(source, texts)` — 批量嵌入，返回 `{ embeddings, model, dimension }`
+- `test_embedding_source(source)` — 测试嵌入源是否可用
+- 支持两种来源：本地 llama.cpp (`/v1/embeddings`) 或 Provider 的 OpenAI 兼容端点
+- 来源类型：`EmbeddingSource::Model { port, model_name }` / `EmbeddingSource::Provider { provider_id, model }`
+
+### `src-tauri/src/vector_store.rs` — 项目向量索引
+
+SQLite 存储代码分块向量，余弦相似度检索（数据量小，全表扫描足够）。
+
+- `store_chunks(project_path, file_path, chunks, model_name)` — 存储分块（同文件增量更新，先删后插）
+- `delete_project_index(project_path)` — 删除整个项目索引
+- `search_similar(project_path, query_embedding, top_k)` — 相似度检索，返回 Top-K 分块
+- `get_index_stats()` — 索引统计（分块数 / 文件数 / 项目数）
+- 数据库位置：`app_data_dir/vector_index.db`
+- 表结构：`project_chunks(project_path, file_path, chunk_index, content, embedding_json, updated_at)`，唯一索引 `(project_path, file_path, chunk_index)`
+- 核心逻辑拆为 `*_conn` 函数（接受 `&Connection`），便于单元测试
 
 ### `src-tauri/src/providers.rs` — Provider 管理
 
