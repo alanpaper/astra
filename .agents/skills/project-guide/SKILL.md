@@ -1,6 +1,6 @@
 ---
 name: project-guide
-description: 星野 (Astra) 项目的架构指南与开发约束。当在 astra 仓库中修改前端（SvelteKit 2 / Svelte 5 页面、组件、store）、Rust 后端（Tauri 命令、agent.rs 桥接层、会话存储）、新增页面/命令/全局状态、或排查 Agent 事件流问题时必须遵守。包含目录结构、Agent 并发约束、Tauri 命令清单与开发约定。
+description: 星野 (Astra) 项目的架构指南与开发约束。当在 astra 仓库中修改前端（React 19 页面、组件、zustand store）、Rust 后端（Tauri 命令、agent.rs 桥接层、会话存储）、新增页面/命令/全局状态、或排查 Agent 事件流 / 多会话问题时必须遵守。包含目录结构、Agent 并发约束、Tauri 命令清单与开发约定。
 ---
 
 # 星野 (Astra) 项目架构指南
@@ -9,53 +9,54 @@ description: 星野 (Astra) 项目的架构指南与开发约束。当在 astra 
 
 ## 技术栈与数据流
 
-- SvelteKit 2 + Svelte 5 + Tauri 2 + Vite 6
+- React 19 + zustand 5 + react-router 7 + Tauri 2 + Vite 6 + SCSS（旧 SvelteKit 已删除）
+- 前端源码在 `src/src/`（`src/` 是前端包根，自带 package.json；Tauri 通过 `--dir src` 调用）
 - 数据流：前端 → Tauri invoke → Rust 命令 → 文件系统 / SQLite
 - Agent Runtime 在独立仓库 `astra-core`（多 crate workspace），astra 通过 path 依赖引用：
   `agent-core = { package = "astra-agent", path = "../../astra-core" }`
   agent-core 拥有运行循环、权限判定与工具执行；astra 侧只做「宿主适配」
-- 主题：亮 / 暗 + 渐变背景（全局 CSS 变量），CSS 变量定义在 `src/styles/global.css`（90+ 变量）
+- 主题：亮 / 暗 + 渐变背景（全局 CSS 变量），变量定义在 `src/src/styles/_variables.scss`
+- 样式约定：SCSS + BEM 命名 + 只引用 var(--...) 主题变量；每页面一个同名 .scss
 
 ## 目录结构
 
 ```
 astra/
-├── src/                          # 前端
-│   ├── lib/
-│   │   ├── ui/Modal.svelte       # 通用弹窗（Esc 关闭/confirm 变体/防误触）
-│   │   ├── home/                 # 工作空间页子组件（ProjectCard/ProjectDetail/...）
-│   │   ├── ChatToolbar.svelte    # 对话页工具栏（渲染在标题栏）
-│   │   ├── chat-state.svelte.ts  # 对话页工具栏状态
-│   │   ├── favorite-store.svelte.ts / logs-store.svelte.ts / nm-store.svelte.ts
-│   │   ├── theme.svelte.ts / workspace.svelte.ts / format.ts
-│   ├── routes/
-│   │   ├── +layout.svelte        # 侧边栏 + 标题栏（titlebar-slot）
-│   │   ├── +page.svelte          # 工作空间页（编排层）
-│   │   ├── chat/                 # 对话页（编排层 + 7 子组件）
-│   │   │   ├── ChatMessageView / Composer / HistoryDrawer
-│   │   │   ├── MarkdownMessage / MentionPopup / SettingsSheet / Welcome
-│   │   │   ├── action-links.ts         # action:// 链接解析与执行
-│   │   │   ├── types.ts / workspace-context.ts
-│   │   ├── models/               # 本地模型管理（编排层 + ModelCard/FormModal/ScanPanel）
-│   │   ├── providers/            # Provider CRUD（列表 + [id] 详情）
-│   │   ├── skills/               # 系统技能浏览（~/.agents/skills 全局 Git 技能）
-│   │   ├── settings/ logs/ dev-mode/[encoded]/
-│   │   └── tools/                # 工具箱（downloader / nm）
-│   └── styles/                   # global.css（变量）+ ui.css（共享类）
-└── src-tauri/src/
-    ├── lib.rs                    # 命令注册、工作空间、项目、编辑器、模型
-    ├── agent.rs                  # ★ Agent Runtime 桥接层（agent-core → Tauri）
-    ├── agent_threads.rs          # Thread 持久化（SQLite + 错误上报）
-    ├── agent_sessions.rs         # Agent 会话历史（JSON 文件）
-    ├── session_store.rs          # 会话 JSON 共享辅助（chat/agent 共用）
-    ├── user_skills.rs            # 应用自有技能库（app_data_dir/skills）
-    ├── chat.rs / chat_sessions.rs # 简单流式对话（非 Agent）+ 历史
-    ├── command_runner.rs / dev_mode.rs / downloader.rs
-    ├── embedding.rs / indexer.rs / vector_store.rs   # RAG 子系统
-    └── providers.rs              # Provider CRUD（providers.json）
+├── src/                          # 前端包根（package.json / vite.config / tsconfig）
+│   └── src/
+│       ├── App.tsx               # react-router 路由表
+│       ├── main.tsx
+│       ├── pages/                # 页面（编排层）+ 页面级子组件
+│       │   ├── WorkspacePage.tsx         # 工作空间页
+│       │   ├── AgentPage.tsx             # ★ Agent 页（编排层 + EntryView 等内联子组件）
+│       │   ├── AgentTabs.tsx/.scss       # ★ 多会话标签栏（S0）
+│       │   ├── AgentHistoryPanel.tsx/.scss # ★ 历史侧栏即导航（全局平铺 + 时间分桶 + 项目徽标）
+│       │   ├── chat/                     # 对话页子组件（Composer/MarkdownMessage/MentionPopup/...）
+│       │   ├── models/ providers/ skills/ settings/ logs/ tools/ dev-mode/
+│       ├── stores/               # zustand 全局 store
+│       │   ├── agent.ts          # ★ Agent 会话全局状态（含多会话 S0；模块级事件监听）
+│       │   ├── agent.test.mjs    # node:test 单测（transpile + vm 加载 agent.ts）
+│       │   ├── workspace.ts / chatToolbar.ts / logs.ts / favorite.ts / nm.ts
+│       ├── components/           # 跨页面组件（agent/ chat/ ui/Modal illustrations/ layout/）
+│       ├── hooks/                # useMention / useSlash / useOutputScroll / ...
+│       ├── features/             # home / models 页面子模块
+│       └── styles/               # _variables.scss（主题变量）+ global.scss + ui.scss
+└── src-tauri/
+    ├── tauri.conf.json           # beforeDevCommand: pnpm --dir src dev; frontendDist: ../src/dist
+    └── src/
+        ├── lib.rs                # 命令注册、工作空间、项目、编辑器、模型
+        ├── agent.rs              # ★ Agent Runtime 桥接层（agent-core → Tauri）+ checkpoint 命令
+        ├── agent_threads.rs      # Thread 持久化（SQLite + 错误上报）
+        ├── agent_sessions.rs     # Agent 会话历史（JSON 文件）
+        ├── session_store.rs      # 会话 JSON 共享辅助（chat/agent 共用）
+        ├── user_skills.rs        # 应用自有技能库（app_data_dir/skills）
+        ├── chat.rs / chat_sessions.rs # 简单流式对话（非 Agent）+ 历史
+        ├── command_runner.rs / dev_mode.rs / downloader.rs
+        ├── embedding.rs / indexer.rs / vector_store.rs   # RAG 子系统
+        └── providers.rs          # Provider CRUD（providers.json）
 ```
 
-## Agent 架构要点（改 agent.rs 前必读）
+## Agent 架构要点（改 agent.rs 或 agent.ts 前必读）
 
 ### 事件流
 
@@ -75,7 +76,26 @@ astra/
 - `AgentState.active` 是单槽 `Option<(session_id, RunHandle)>` —— **同一时刻全局只允许一个活动 Run**
 - `agent_start_run` 用 `threads.try_lock_owned()` 独占准入，运行中再调用返回
   "Agent is running, draining or changing sessions"
-- 若要支持多开 agent 对话：Thread 已按 session_id 隔离，卡点在 active 单槽与 threads 锁的持有粒度，需改为按 session 隔离的并发模型
+- **多会话（S0）已在前端落地但后端仍单活动 Run**：前端 UI 互斥（`runningSessionId()` 守卫
+  canSend / handleSend），运行中的会话可切走驻留、事件持续路由，但发送必须等它结束
+- 若要真正的并发多开：Thread 已按 session_id 隔离，卡点在 active 单槽与 threads 锁的持有粒度，
+  需改为按 session 隔离的并发模型（SESSION_RUNTIME_SPEC P3）
+
+### 多会话运行时（S0，设计冻结见 astra-core/docs/SESSION_RUNTIME_SPEC.md）
+
+- **tab 即 AgentSession 视图**：`AgentTabs.tsx` 渲染 `openTabs`；激活会话字段平铺在 store，
+  非激活会话快照驻留 `parked: Record<string, ParkedSession>`（swap 模型，切回零重建）
+- **事件按 session_id 路由**：`agent-event` 监听器区分 flat / parked；parked 运行中的会话
+  持续吸收事件，终端事件后进入 persisting 屏障等 `agent-run-settled`
+- **tab 状态并入 agent store**（openTabs / activeTabId / isDraft，易失不持久化）——
+  因 `agent.test.mjs` 的 vm mock 只认 4 个模块，agent.ts **不得新增 import**
+- **保护规则**：running / settling / 待决策卡（`hasPendingDecision`）/ 输入非空的会话不可被
+  LRU 驱逐或关闭 tab；`MAX_RETAINED_TABS = 8`，超限按 lastActive 清理（先落库再 reset）
+- **草稿语义**：空草稿（未发首条消息）不驻留、不保存、其 tab 被目标顶替丢弃；`pushUser` /
+  发送后 `isDraft=false` 转正
+- **历史即导航**：`AgentHistoryPanel` 全局平铺（不按项目分组，项目只是会话属性）、时间分桶
+  （今天/昨天/更早）、项目徽标、运行中/待处理/打开中标识；点条目 `activateSession` 换入
+- **应用重启恢复**：`refreshAgentStatus` 发现未知运行中会话 → 建驻留快照并自动开 tab
 
 ### 权限桥与提问桥
 
@@ -87,22 +107,26 @@ astra/
 ### 会话模型
 
 - session_id 由**前端生成**；Thread 按 session_id 缓存，创建时绑定 project_root 与模型 backend —— **切换项目 / 模型来源后必须新开会话**
-- `agent_reset_session` 只 unload 内存；重启历史由 SQLite 负责
+- `agent_reset_session` 只 unload 内存；重启历史由 SQLite 负责；多会话下仅在**关闭 tab /
+  LRU 驱逐 / 手动新对话**时调用（切走驻留不清后端上下文）
 - 持久化失败记入 `PersistenceErrors`，经 `agent_status` 暴露；有未落盘后缀的 Thread 拒绝 unload
 - 前端条目流另存 `agent_sessions.json`，恢复时原样回放；`session_files: HashSet` 防止删除后的迟到保存
+- Checkpoint：`agent_checkpoint_list / create / restore`（agent.rs），前端 `CheckpointButton`
 
 ## 前端约定
 
-- **编排层模式**：`+page.svelte` 只做数据加载与状态协调，子组件拆到同目录或 `lib/`
-- **全局 Store**：`src/lib/xxx-store.svelte.ts`，`$state` + `class XxxStore` 单例导出；仅单页面用的状态留在 `+page.svelte`
-- **事件监听**：`onMount` 中 `listen('event-name', cb)`，返回的 unlisten 在 `onDestroy` 清理
-- **弹窗**：用 `lib/ui/Modal.svelte` + `ui.css`，不要各页面自实现。表单类传 `closeOnOverlay={false}`，确认类传 `variant="confirm"`
-- **样式**：先查 `ui.css`（btn/modal/form/empty-state/badge 等共享类），再考虑 scoped 样式
+- **页面编排层**：`pages/XxxPage.tsx` 只做数据加载与状态协调，子组件拆同目录或 `components/`
+- **全局 Store**：`stores/xxx.ts`，zustand `create` + 选择器订阅（selector 返回原始值/引用，
+  不要返回新建对象）；仅单页面用的 useState 留在页面组件
+- **事件监听**：模块级单例（见 agent.ts `ensureAgentListeners`）——切页不丢事件；返回的
+  unlisten 仅在注册失败回滚时调用
+- **弹窗**：用 `components/ui/Modal.tsx`
+- **样式**：先查 `styles/ui.scss` 共享类；页面样式 BEM + var(--...)；图标用 lucide-react
 - **@ 提及正则**（改动需谨慎，`\w` 不含中文必须显式加 `\u4e00-\u9fff`）：
   检测 `/(?:^|\s)@([\w\u4e00-\u9fff.-]*)$/`，解析 `/@([\w\u4e00-\u9fff][\w\u4e00-\u9fff.-]*)/g`
-- **action:// 协议**：`[描述](action://command_type?param=value)`，已实现 `open_project` / `run_command`；新消息由 `autoExecuteActionLinks()` 自动执行（`isFresh` 控制）
-
-> 注意：前端目前**没有 Agent 页面**（后端 agent.rs 已就绪），/chat 仍走旧 `chat.rs`（全局单流、事件无会话 ID）。新建 Agent 前端的对接点是 `agent_start_run` + `agent-event` 事件流。
+- **action:// 协议**：`[描述](action://command_type?param=value)`，`autoExecuteActionLinks()` 自动执行
+- **agent.ts 改动必须跑** `node --test src/src/stores/agent.test.mjs`（在 `src/` 下执行
+  `node --test src/stores/agent.test.mjs`）；新增 store 能力先补测试
 
 ## 后端约定
 
@@ -137,6 +161,7 @@ agent_set_auto_all(enabled)
 agent_reset_session(session_id)
 agent_status           // running / session_id / persistence_errors
 agent_recent_events(limit)
+agent_checkpoint_list / agent_checkpoint_create / agent_checkpoint_restore
 
 // Agent 会话
 list_agent_sessions / save_agent_session / delete_agent_session
@@ -157,12 +182,15 @@ search_similar / get_index_stats
 ## 常用开发命令
 
 ```bash
-export PATH="/Users/hanbiao/.local/share/fnm/node-versions/v22.14.0/installation/bin:$PATH"
-pnpm dev              # Vite 开发服务器
-pnpm tauri dev        # 完整 Tauri 应用（带 Rust 热重载）
-pnpm build            # 前端构建
-pnpm tauri build      # 打包 macOS app
-pnpm check            # svelte-check 类型检查
+# 前端（前端包根是 src/）
+pnpm --dir src dev         # Vite 开发服务器
+pnpm --dir src typecheck   # tsc --noEmit
+pnpm --dir src build       # 前端构建
+pnpm tauri dev             # 完整 Tauri 应用（仓库根，带 Rust 热重载）
+pnpm tauri build           # 打包 macOS app
+
+# Agent store 单测（在 src/ 下）
+cd src && node --test src/stores/agent.test.mjs
 ```
 
 ## 相关 skill
@@ -170,5 +198,5 @@ pnpm check            # svelte-check 类型检查
 - **rust-agent-runtime** — 修改 agent.rs / agent_threads.rs 或 astra-core 时必须加载
 - **build-agent-runtime** — 理解 agent runtime 设计参考
 - **tauri-v2** — Tauri 命令、权限配置、IPC 细节
-- **svelte-core-bestpractices** — 编写 Svelte 5 组件时加载
 - **rust-best-practices** — Rust 代码规范
+- 设计冻结文档：astra-core/docs/ `AGENT_WORKSPACE_SPEC.md` / `SESSION_RUNTIME_SPEC.md`
