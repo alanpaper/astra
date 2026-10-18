@@ -12,9 +12,11 @@ description: 星野 (Astra) 项目的架构指南与开发约束。当在 astra 
 - React 19 + zustand 5 + react-router 7 + Tauri 2 + Vite 6 + SCSS（旧 SvelteKit 已删除）
 - 前端源码在 `src/src/`（`src/` 是前端包根，自带 package.json；Tauri 通过 `--dir src` 调用）
 - 数据流：前端 → Tauri invoke → Rust 命令 → 文件系统 / SQLite
-- Agent Runtime 在独立仓库 `astra-core`（多 crate workspace），astra 通过 path 依赖引用：
-  `agent-core = { package = "astra-agent", path = "../../astra-core" }`
+- Agent Runtime 在独立仓库 `astra-core`（多 crate workspace，crates/astra-* 16 个 crate），
+  astra 通过 path 依赖引用：`agent-core = { package = "astra-agent", path = "../../astra-core" }`
   agent-core 拥有运行循环、权限判定与工具执行；astra 侧只做「宿主适配」
+- 另按需引用 astra-core 子 crate：`astra-mcp`（MCP 客户端）/ `astra-acp`（ACP 适配）/
+  `astra-process`（子进程）
 - 主题：亮 / 暗 + 渐变背景（全局 CSS 变量），变量定义在 `src/src/styles/_variables.scss`
 - 样式约定：SCSS + BEM 命名 + 只引用 var(--...) 主题变量；每页面一个同名 .scss
 
@@ -46,6 +48,10 @@ astra/
     └── src/
         ├── lib.rs                # 命令注册、工作空间、项目、编辑器、模型
         ├── agent.rs              # ★ Agent Runtime 桥接层（agent-core → Tauri）+ checkpoint 命令
+        ├── extensions.rs         # MCP/ACP 扩展管理（读写 ~/.astra/config.toml + 启停/删除）
+        ├── mcp_config_tool.rs    # 宿主工具 mcp_config_read/write（让 agent 帮用户装/改 MCP）
+        ├── memory.rs             # 记忆系统桥（MemoryHost 加密 sqlite → MemoryProvider）
+        ├── market.rs             # 本地扩展市场状态（不读远程；安装引导回 Agent 对话）
         ├── agent_threads.rs      # Thread 持久化（SQLite + 错误上报）
         ├── agent_sessions.rs     # Agent 会话历史（JSON 文件）
         ├── session_store.rs      # 会话 JSON 共享辅助（chat/agent 共用）
@@ -104,9 +110,34 @@ astra/
 - 发送端被清理（取消/重置）时 receiver 收 Err → 自动 Deny，不挂死运行循环
 - `QuestionHub`：question_id → oneshot；用户取消回传 None → 工具收到错误
 
+### MCP/ACP 扩展
+
+- 扩展配置在 `~/.astra/config.toml`（[mcp_servers.*] / ACP 段），由 `extensions.rs` 读写
+- **装配时机**：每次 `agent_start_run` 前按当前启停表 `attach_extensions`（agent.rs）；
+  但 **MCP 工具集合在建 Thread 时冻结**——新装/启停 MCP 后需新开会话才生效
+- `required` 扩展启动失败阻断 Run，其余失败降级为提示；运行态经
+  `extensions_runtime_status` 暴露（MarketPage 展示启停/可用徽标）
+- **agent 可帮用户改配置**：宿主工具 `mcp_config_read`（Allow）/
+  `mcp_config_write`（Confirm；upsert / set_enabled / remove，toml_edit 保留注释，
+  写后 astra-config schema 校验失败自动回滚）。新装 MCP 的引导话术是
+  「回 Agent 对话说一句」，MarketPage 不做远程拉取
+- **净化 PATH 坑**：MCP server 的 `command` 必须用绝对路径（如
+  `/opt/homebrew/bin/uvx`、fnm node 的绝对路径），否则 spawn 报 os error 2
+- 新增宿主工具必须同步加进 agent.rs 的 ToolPolicy 白名单
+  （allowed_readonly / confirm_tools），**未知工具默认 Deny**
+
+### 记忆系统（memory.rs + astra-memory）
+
+- 宿主实现 `MemoryHost`：加密 sqlite（`memory.key` 存密钥，XChaCha20-Poly1305），
+  实现 astra-core 的 `MemoryProvider` trait，经 AgentState 注入
+- 命令：`memory_status`（可用态）/ `memory_search`（语义检索）/ `memory_remember` /
+  `memory_forget`；依赖 astra-memory 的嵌入能力
+- **recall 注入**：agent_start_run 时检索相关记忆拼进 system prompt
+  （REMEMBERED CONTEXT 段）——agent 静默使用，不向用户解说记忆的存在
+
 ### 会话模型
 
-- session_id 由**前端生成**；Thread 按 session_id 缓存，创建时绑定 project_root 与模型 backend —— **切换项目 / 模型来源后必须新开会话**
+- session_id 由**前端生成**；Thread 按 session_id 缓存，创建时绑定 project_root 与模型 backend —— 切换项目仍需新会话；**模型/图片识别配置已解绑**（切换后 dest_changed 自动卸载缓存 Thread 并重建，当前会话即时生效，无需新开）；**MCP 工具集合仍冻结**（见上节，新会话生效）
 - `agent_reset_session` 只 unload 内存；重启历史由 SQLite 负责；多会话下仅在**关闭 tab /
   LRU 驱逐 / 手动新对话**时调用（切走驻留不清后端上下文）
 - 持久化失败记入 `PersistenceErrors`，经 `agent_status` 暴露；有未落盘后缀的 Thread 拒绝 unload
@@ -135,6 +166,9 @@ astra/
 - chat.rs 是**全局单流**设计（单 `ChatStopFlag`，事件无会话 ID），不要在它上面叠加多会话需求——多会话走 agent.rs
 - 会话历史用 `session_store.rs` 的共享辅助（ensure_json_file / read_json_vec），不要另写 JSON 读写
 - vector_store.rs 的核心逻辑拆 `*_conn` 函数（接受 `&Connection`）便于单测
+- **search_web 引擎可配置**：AppSettings.search_engine（bing | duckduckgo | searxng）
+  → `agent_core::net_tools::SearchEngine::resolve` → `SearchTools::with_engine`；
+  默认 Bing，仅配了 searxng endpoint 未选引擎时保持旧语义
 
 ## Tauri 命令清单
 
@@ -162,6 +196,14 @@ agent_reset_session(session_id)
 agent_status           // running / session_id / persistence_errors
 agent_recent_events(limit)
 agent_checkpoint_list / agent_checkpoint_create / agent_checkpoint_restore
+extensions_runtime_status   // MCP/ACP 运行态（供 market 页启停/可用徽标）
+market_status               // 本地扩展市场状态（不读远程）
+
+// MCP/ACP 扩展管理（extensions.rs）
+extensions_list / extensions_set_enabled / extensions_remove / extensions_update
+
+// 记忆系统（memory.rs）
+memory_status / memory_search / memory_remember / memory_forget
 
 // Agent 会话
 list_agent_sessions / save_agent_session / delete_agent_session
