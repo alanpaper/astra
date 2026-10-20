@@ -659,7 +659,7 @@ export default function ProviderDetailPage() {
               type="text"
               value={editBaseUrl}
               onChange={(e) => setEditBaseUrl(e.target.value)}
-              placeholder={editKind === 'anthropic' ? 'https://api.anthropic.com/v1' : 'http://172.16.4.197:8002/v1'}
+              placeholder={editKind === 'anthropic' ? 'https://api.anthropic.com' : 'http://172.16.4.197:8002/v1'}
             />
           </div>
           <div className="form-group">
