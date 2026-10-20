@@ -106,7 +106,10 @@ astra/
 ### 权限桥与提问桥
 
 - `PermissionHub`：tool_call_id → oneshot::Sender<Decision>；**批准只放行该次具体调用，不扩大范围**
-- 放权模式 `agent_set_auto_all(true)`：Confirm 类直接 Allow；Deny 硬规则（未注册工具、提权命令、路径逃逸）不受影响
+- 多级放权 `agent_set_auto_mode(mode)`（off/project/workspace/all）：all 级 Confirm 类直接 Allow；
+  project/workspace 级仅当参数路径全部落在项目根 / 已配置工作空间内才自动 Allow，
+  否则回退确认（shell 等无路径参数的操作仅 all 级放行）；Deny 硬规则（未注册工具、
+  提权命令、路径逃逸）不受任何级别影响
 - 发送端被清理（取消/重置）时 receiver 收 Err → 自动 Deny，不挂死运行循环
 - `QuestionHub`：question_id → oneshot；用户取消回传 None → 工具收到错误
 
@@ -191,7 +194,7 @@ agent_start_run        // 启动一轮 Run，事件经 agent-event 流出，返�
 agent_cancel           // 取消当前 Run（丢弃挂起权限/问题请求）
 agent_permission_decide(tool_call_id, decision)
 agent_question_answer(question_id, answer)   // None = 取消
-agent_set_auto_all(enabled)
+agent_set_auto_mode(mode)   // 多级放权 off|project|workspace|all（旧 agent_set_auto_all 已移除）
 agent_reset_session(session_id)
 agent_status           // running / session_id / persistence_errors
 agent_recent_events(limit)
