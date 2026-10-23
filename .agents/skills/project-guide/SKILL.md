@@ -1,9 +1,9 @@
 ---
 name: project-guide
-description: 星野 (Astra) 项目的架构指南与开发约束。当在 astra 仓库中修改前端（React 19 页面、组件、zustand store）、Rust 后端（Tauri 命令、agent.rs 桥接层、会话存储）、新增页面/命令/全局状态、或排查 Agent 事件流 / 多会话问题时必须遵守。包含目录结构、Agent 并发约束、Tauri 命令清单与开发约定。
+description: Astra 项目的架构指南与开发约束。当在 astra 仓库中修改前端（React 19 页面、组件、zustand store）、Rust 后端（Tauri 命令、agent.rs 桥接层、会话存储）、新增页面/命令/全局状态、或排查 Agent 事件流 / 多会话问题时必须遵守。包含目录结构、Agent 并发约束、Tauri 命令清单与开发约定。
 ---
 
-# 星野 (Astra) 项目架构指南
+# Astra 项目架构指南
 
 在 astra 仓库工作时遵循本指南。改代码前先读对应章节，了解文件职责边界与既有模式。
 
